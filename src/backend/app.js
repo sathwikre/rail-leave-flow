@@ -386,21 +386,17 @@ export async function createApp() {
   const distPath = path.join(__dirname, "../../dist");
 
   // Serve static assets from the frontend build
-  app.use(express.static(distPath));
+app.use(express.static(distPath));
 
-  // Keep API not-found handling scoped to API routes only
-  app.use(
-    "/api",
-    (_req, _res, next) => next(notFound("API route not found")),
-  );
+app.use("/api", (_req, _res, next) => {
+  next(notFound("API route not found"));
+});
 
-  // For any non-API route, serve the frontend app (index.html)
-  app.get("*", (req, res, next) => {
-    if (req.path.startsWith("/api")) return next();
-    res.sendFile(path.join(distPath, "index.html"), (err) => {
-      if (err) next(err);
-    });
-  });
+app.get(/^(?!\/api).*/, (req, res) => {
+  res.sendFile(path.join(distPath, "index.html"));
+});
+
+app.use(errorHandler);
 
   app.use(errorHandler);
 
