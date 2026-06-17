@@ -17,6 +17,7 @@ function EmployeeProfile() {
   const history = leaveHistoryFor(emp.id);
   const used = emp.leaveUsedThisMonth;
   const remaining = MONTHLY_LIMIT - used;
+  const lastLeave = history[0]?.date ?? "—";
   const presentDays = 22 - used;
   const attendancePct = Math.round((presentDays / 22) * 100);
 
@@ -45,6 +46,17 @@ function EmployeeProfile() {
             <Stat label="Remaining" value={remaining} tone={remaining > 0 ? "success" : "destructive"} />
             <Stat label="Present" value={presentDays} suffix="days" />
             <Stat label="Attendance" value={`${attendancePct}%`} tone="success" />
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Last Leave Taken</p>
+              <p className="font-display text-lg font-bold mt-1">{lastLeave}</p>
+            </div>
+            <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+              <p className="text-xs text-muted-foreground uppercase tracking-wider">Total This Month</p>
+              <p className="font-display text-lg font-bold mt-1">{used} day{used !== 1 ? "s" : ""}</p>
+            </div>
           </div>
 
           <div className="rounded-2xl border border-border bg-card shadow-sm p-5">

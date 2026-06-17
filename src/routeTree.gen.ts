@@ -10,27 +10,14 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SettingsRouteImport } from './routes/settings'
-import { Route as ReportsRouteImport } from './routes/reports'
-import { Route as LeaveRequestsRouteImport } from './routes/leave-requests'
 import { Route as EmployeesRouteImport } from './routes/employees'
 import { Route as AttendanceRouteImport } from './routes/attendance'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as LeaveRequestsIdRouteImport } from './routes/leave-requests.$id'
 import { Route as EmployeesIdRouteImport } from './routes/employees.$id'
 
 const SettingsRoute = SettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ReportsRoute = ReportsRouteImport.update({
-  id: '/reports',
-  path: '/reports',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LeaveRequestsRoute = LeaveRequestsRouteImport.update({
-  id: '/leave-requests',
-  path: '/leave-requests',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EmployeesRoute = EmployeesRouteImport.update({
@@ -48,11 +35,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LeaveRequestsIdRoute = LeaveRequestsIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => LeaveRequestsRoute,
-} as any)
 const EmployeesIdRoute = EmployeesIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -63,72 +45,42 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/attendance': typeof AttendanceRoute
   '/employees': typeof EmployeesRouteWithChildren
-  '/leave-requests': typeof LeaveRequestsRouteWithChildren
-  '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/employees/$id': typeof EmployeesIdRoute
-  '/leave-requests/$id': typeof LeaveRequestsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/attendance': typeof AttendanceRoute
   '/employees': typeof EmployeesRouteWithChildren
-  '/leave-requests': typeof LeaveRequestsRouteWithChildren
-  '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/employees/$id': typeof EmployeesIdRoute
-  '/leave-requests/$id': typeof LeaveRequestsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/attendance': typeof AttendanceRoute
   '/employees': typeof EmployeesRouteWithChildren
-  '/leave-requests': typeof LeaveRequestsRouteWithChildren
-  '/reports': typeof ReportsRoute
   '/settings': typeof SettingsRoute
   '/employees/$id': typeof EmployeesIdRoute
-  '/leave-requests/$id': typeof LeaveRequestsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths:
-    | '/'
-    | '/attendance'
-    | '/employees'
-    | '/leave-requests'
-    | '/reports'
-    | '/settings'
-    | '/employees/$id'
-    | '/leave-requests/$id'
+  fullPaths: '/' | '/attendance' | '/employees' | '/settings' | '/employees/$id'
   fileRoutesByTo: FileRoutesByTo
-  to:
-    | '/'
-    | '/attendance'
-    | '/employees'
-    | '/leave-requests'
-    | '/reports'
-    | '/settings'
-    | '/employees/$id'
-    | '/leave-requests/$id'
+  to: '/' | '/attendance' | '/employees' | '/settings' | '/employees/$id'
   id:
     | '__root__'
     | '/'
     | '/attendance'
     | '/employees'
-    | '/leave-requests'
-    | '/reports'
     | '/settings'
     | '/employees/$id'
-    | '/leave-requests/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AttendanceRoute: typeof AttendanceRoute
   EmployeesRoute: typeof EmployeesRouteWithChildren
-  LeaveRequestsRoute: typeof LeaveRequestsRouteWithChildren
-  ReportsRoute: typeof ReportsRoute
   SettingsRoute: typeof SettingsRoute
 }
 
@@ -139,20 +91,6 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/settings'
       preLoaderRoute: typeof SettingsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/reports': {
-      id: '/reports'
-      path: '/reports'
-      fullPath: '/reports'
-      preLoaderRoute: typeof ReportsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/leave-requests': {
-      id: '/leave-requests'
-      path: '/leave-requests'
-      fullPath: '/leave-requests'
-      preLoaderRoute: typeof LeaveRequestsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/employees': {
@@ -176,13 +114,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/leave-requests/$id': {
-      id: '/leave-requests/$id'
-      path: '/$id'
-      fullPath: '/leave-requests/$id'
-      preLoaderRoute: typeof LeaveRequestsIdRouteImport
-      parentRoute: typeof LeaveRequestsRoute
-    }
     '/employees/$id': {
       id: '/employees/$id'
       path: '/$id'
@@ -205,24 +136,10 @@ const EmployeesRouteWithChildren = EmployeesRoute._addFileChildren(
   EmployeesRouteChildren,
 )
 
-interface LeaveRequestsRouteChildren {
-  LeaveRequestsIdRoute: typeof LeaveRequestsIdRoute
-}
-
-const LeaveRequestsRouteChildren: LeaveRequestsRouteChildren = {
-  LeaveRequestsIdRoute: LeaveRequestsIdRoute,
-}
-
-const LeaveRequestsRouteWithChildren = LeaveRequestsRoute._addFileChildren(
-  LeaveRequestsRouteChildren,
-)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AttendanceRoute: AttendanceRoute,
   EmployeesRoute: EmployeesRouteWithChildren,
-  LeaveRequestsRoute: LeaveRequestsRouteWithChildren,
-  ReportsRoute: ReportsRoute,
   SettingsRoute: SettingsRoute,
 }
 export const routeTree = rootRouteImport

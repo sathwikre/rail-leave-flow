@@ -97,13 +97,20 @@ export function getEmployee(id: string) { return employees.find(e => e.id === id
 export function getRequest(id: string) { return leaveRequests.find(r => r.id === id); }
 
 export function leaveHistoryFor(employeeId: string): LeaveHistoryEntry[] {
+  // Include any approved leaveRequests for this employee first (persisted), then append seeded synthetic history
+  const approved = leaveRequests
+    .filter(r => r.employeeId === employeeId && r.status === "approved")
+    .map(r => ({ date: r.fromDate, days: r.days, reason: r.reason, status: r.status as LeaveStatus }));
+
   const r2 = seededRandom(employeeId.split("").reduce((a, c) => a + c.charCodeAt(0), 0));
   const n = 4 + Math.floor(r2() * 6);
-  return Array.from({ length: n }, (_, i) => {
+  const synthetic = Array.from({ length: n }, (_, i) => {
     const d = addDays(today, -Math.floor(r2() * 180) - i * 10);
     const status: LeaveStatus = r2() < 0.7 ? "approved" : r2() < 0.5 ? "pending" : "rejected";
     return { date: dateStr(d), days: 1 + Math.floor(r2() * 3), reason: pick(reasons), status };
   }).sort((a, b) => b.date.localeCompare(a.date));
+
+  return approved.concat(synthetic).sort((a, b) => b.date.localeCompare(a.date));
 }
 
 export const monthlyStats = [
@@ -141,7 +148,7 @@ export function getDashboardStats() {
   }).length;
   return {
     totalWorkers: total,
-    presentToday: total - onLeave - 2,
+    presentToday: Math.max(total - onLeave, 0),
     onLeaveToday: onLeave,
     pendingRequests: leaveRequests.filter(r => r.status === "pending").length,
     approvedThisMonth: leaveRequests.filter(r => r.status === "approved").length,
@@ -157,4 +164,38 @@ export function recommendationFor(employeeId: string, requestedDays: number) {
     return { decision: "APPROVE" as const, reason: `Within monthly limit. ${remaining} day(s) remaining before this request.` };
   }
   return { decision: "REJECT" as const, reason: `Exceeds monthly limit of ${MONTHLY_LIMIT} days. Only ${remaining} day(s) remaining.` };
+}
+
+export function createLeaveRequest(employeeId: string, employeeName: string, fromDate: string, toDate: string, reason: string) {
+  function dateDiffInclusive(a: string, b: string) {
+    const da = new Date(a);
+    const db = new Date(b);
+    da.setHours(0,0,0,0); db.setHours(0,0,0,0);
+    const diff = Math.round((db.getTime() - da.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+    return Math.max(0, diff);
+  }
+  const days = dateDiffInclusive(fromDate, toDate);
+  const id = `LR-${pad(2001 + leaveRequests.length, 4)}`;
+  const requestDate = dateStr(new Date());
+  const req: LeaveRequest = { id, employeeId, employeeName, fromDate, toDate, days, reason, requestDate, status: "pending" };
+  leaveRequests.unshift(req);
+  return req;
+}
+
+export function approveLeave(requestId: string) {
+  const req = leaveRequests.find(r => r.id === requestId);
+  if (!req) return null;
+  req.status = "approved";
+  const emp = getEmployee(req.employeeId);
+  if (emp) {
+    emp.leaveUsedThisMonth = (emp.leaveUsedThisMonth || 0) + req.days;
+  }
+  return req;
+}
+
+export function rejectLeave(requestId: string) {
+  const req = leaveRequests.find(r => r.id === requestId);
+  if (!req) return null;
+  req.status = "rejected";
+  return req;
 }
