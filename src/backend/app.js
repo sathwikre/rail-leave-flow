@@ -1,6 +1,8 @@
 import cors from "cors";
 import express from "express";
 import nodemailer from "nodemailer";
+import path from "path";
+import { fileURLToPath } from "url";
 import { config } from "./config.js";
 import { collections, connectDatabase } from "./db.js";
 import { ApiError, asyncHandler, errorHandler, notFound } from "./errors.js";
@@ -377,7 +379,29 @@ export async function createApp() {
     }),
   );
 
-  app.use((_req, _res, next) => next(notFound("API route not found")));
+  // Serve frontend production build (dist/) for non-API routes
+  // Compute __dirname for ES modules
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const distPath = path.join(__dirname, "../../dist");
+
+  // Serve static assets from the frontend build
+  app.use(express.static(distPath));
+
+  // Keep API not-found handling scoped to API routes only
+  app.use(
+    "/api",
+    (_req, _res, next) => next(notFound("API route not found")),
+  );
+
+  // For any non-API route, serve the frontend app (index.html)
+  app.get("*", (req, res, next) => {
+    if (req.path.startsWith("/api")) return next();
+    res.sendFile(path.join(distPath, "index.html"), (err) => {
+      if (err) next(err);
+    });
+  });
+
   app.use(errorHandler);
 
   return app;
