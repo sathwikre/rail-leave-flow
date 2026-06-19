@@ -9,15 +9,27 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as SettingsRouteImport } from './routes/settings'
+import { Route as StationsRouteImport } from './routes/stations'
+import { Route as ReportsRouteImport } from './routes/reports'
+import { Route as LeaveRequestsRouteImport } from './routes/leave-requests'
 import { Route as EmployeesRouteImport } from './routes/employees'
-import { Route as AttendanceRouteImport } from './routes/attendance'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as StationsIdRouteImport } from './routes/stations.$id'
 import { Route as EmployeesIdRouteImport } from './routes/employees.$id'
 
-const SettingsRoute = SettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
+const StationsRoute = StationsRouteImport.update({
+  id: '/stations',
+  path: '/stations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ReportsRoute = ReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeaveRequestsRoute = LeaveRequestsRouteImport.update({
+  id: '/leave-requests',
+  path: '/leave-requests',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EmployeesRoute = EmployeesRouteImport.update({
@@ -25,15 +37,15 @@ const EmployeesRoute = EmployeesRouteImport.update({
   path: '/employees',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AttendanceRoute = AttendanceRouteImport.update({
-  id: '/attendance',
-  path: '/attendance',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const StationsIdRoute = StationsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => StationsRoute,
 } as any)
 const EmployeesIdRoute = EmployeesIdRouteImport.update({
   id: '/$id',
@@ -43,54 +55,91 @@ const EmployeesIdRoute = EmployeesIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/attendance': typeof AttendanceRoute
   '/employees': typeof EmployeesRouteWithChildren
-  '/settings': typeof SettingsRoute
+  '/leave-requests': typeof LeaveRequestsRoute
+  '/reports': typeof ReportsRoute
+  '/stations': typeof StationsRouteWithChildren
   '/employees/$id': typeof EmployeesIdRoute
+  '/stations/$id': typeof StationsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/attendance': typeof AttendanceRoute
   '/employees': typeof EmployeesRouteWithChildren
-  '/settings': typeof SettingsRoute
+  '/leave-requests': typeof LeaveRequestsRoute
+  '/reports': typeof ReportsRoute
+  '/stations': typeof StationsRouteWithChildren
   '/employees/$id': typeof EmployeesIdRoute
+  '/stations/$id': typeof StationsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/attendance': typeof AttendanceRoute
   '/employees': typeof EmployeesRouteWithChildren
-  '/settings': typeof SettingsRoute
+  '/leave-requests': typeof LeaveRequestsRoute
+  '/reports': typeof ReportsRoute
+  '/stations': typeof StationsRouteWithChildren
   '/employees/$id': typeof EmployeesIdRoute
+  '/stations/$id': typeof StationsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/attendance' | '/employees' | '/settings' | '/employees/$id'
+  fullPaths:
+    | '/'
+    | '/employees'
+    | '/leave-requests'
+    | '/reports'
+    | '/stations'
+    | '/employees/$id'
+    | '/stations/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/attendance' | '/employees' | '/settings' | '/employees/$id'
+  to:
+    | '/'
+    | '/employees'
+    | '/leave-requests'
+    | '/reports'
+    | '/stations'
+    | '/employees/$id'
+    | '/stations/$id'
   id:
     | '__root__'
     | '/'
-    | '/attendance'
     | '/employees'
-    | '/settings'
+    | '/leave-requests'
+    | '/reports'
+    | '/stations'
     | '/employees/$id'
+    | '/stations/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  AttendanceRoute: typeof AttendanceRoute
   EmployeesRoute: typeof EmployeesRouteWithChildren
-  SettingsRoute: typeof SettingsRoute
+  LeaveRequestsRoute: typeof LeaveRequestsRoute
+  ReportsRoute: typeof ReportsRoute
+  StationsRoute: typeof StationsRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/settings': {
-      id: '/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof SettingsRouteImport
+    '/stations': {
+      id: '/stations'
+      path: '/stations'
+      fullPath: '/stations'
+      preLoaderRoute: typeof StationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reports': {
+      id: '/reports'
+      path: '/reports'
+      fullPath: '/reports'
+      preLoaderRoute: typeof ReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leave-requests': {
+      id: '/leave-requests'
+      path: '/leave-requests'
+      fullPath: '/leave-requests'
+      preLoaderRoute: typeof LeaveRequestsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/employees': {
@@ -100,19 +149,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EmployeesRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/attendance': {
-      id: '/attendance'
-      path: '/attendance'
-      fullPath: '/attendance'
-      preLoaderRoute: typeof AttendanceRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/': {
       id: '/'
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/stations/$id': {
+      id: '/stations/$id'
+      path: '/$id'
+      fullPath: '/stations/$id'
+      preLoaderRoute: typeof StationsIdRouteImport
+      parentRoute: typeof StationsRoute
     }
     '/employees/$id': {
       id: '/employees/$id'
@@ -136,11 +185,24 @@ const EmployeesRouteWithChildren = EmployeesRoute._addFileChildren(
   EmployeesRouteChildren,
 )
 
+interface StationsRouteChildren {
+  StationsIdRoute: typeof StationsIdRoute
+}
+
+const StationsRouteChildren: StationsRouteChildren = {
+  StationsIdRoute: StationsIdRoute,
+}
+
+const StationsRouteWithChildren = StationsRoute._addFileChildren(
+  StationsRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  AttendanceRoute: AttendanceRoute,
   EmployeesRoute: EmployeesRouteWithChildren,
-  SettingsRoute: SettingsRoute,
+  LeaveRequestsRoute: LeaveRequestsRoute,
+  ReportsRoute: ReportsRoute,
+  StationsRoute: StationsRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

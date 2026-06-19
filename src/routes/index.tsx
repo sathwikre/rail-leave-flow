@@ -1,87 +1,127 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Users, UserCheck, UserX, Clock, ArrowRight, Plus, Download, CalendarDays } from "lucide-react";
+import { Building2, CheckCircle2, Clock, Users } from "lucide-react";
+import { useEffect, useState } from "react";
 import { AppLayout, StatusBadge } from "@/components/AppLayout";
 import { StatCard } from "@/components/StatCard";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/")({
-  head: () => ({ meta: [{ title: "Dashboard — Railway LMS" }] }),
+  head: () => ({ meta: [{ title: "Dashboard - Railway LMS" }] }),
   component: Dashboard,
 });
 
+type DashboardStats = {
+  totalStations: number;
+  totalEmployees: number;
+  employeesOnLeaveToday: number;
+  pendingLeaveRequests: number;
+  recentlyApprovedLeaves: LeaveRequest[];
+};
+
+type LeaveRequest = {
+  id: string;
+  employeeId: string;
+  fromDate: string;
+  toDate: string;
+  days: number;
+  reason: string;
+  status: "Pending" | "Approved" | "Rejected";
+};
+
 function Dashboard() {
-  const [stats, setStats] = useState({
-    totalWorkers: 0,
-    presentToday: 0,
-    onLeaveToday: 0,
-    pendingRequests: 0,
-    approvedThisMonth: 0,
-    rejectedThisMonth: 0,
+  const [stats, setStats] = useState<DashboardStats>({
+    totalStations: 0,
+    totalEmployees: 0,
+    employeesOnLeaveToday: 0,
+    pendingLeaveRequests: 0,
+    recentlyApprovedLeaves: [],
   });
-  const [onLeaveTodayList, setOnLeaveTodayList] = useState<any[]>([]);
 
   useEffect(() => {
     let ignore = false;
 
     async function load() {
       try {
-        const dashRes = await fetch(apiUrl("/api/dashboard"));
-        if (dashRes.ok) {
-          const data = await dashRes.json();
-          if (!ignore) setStats(data);
-        }
-
-        const leavesRes = await fetch(apiUrl("/api/leave-requests?status=approved"));
-        const leaves = leavesRes.ok ? await leavesRes.json() : [];
-        const empRes = await fetch(apiUrl("/api/employees"));
-        const emps = empRes.ok ? await empRes.json() : [];
-
-        const today = new Date().toISOString().slice(0, 10);
-        const onLeave = (leaves || [])
-          .filter((r: any) => r.fromDate <= today && r.toDate >= today)
-          .map((r: any) => ({ ...r, emp: emps.find((e: any) => e.id === r.employeeId) }));
-
-        if (!ignore) setOnLeaveTodayList(onLeave.slice(0, 10));
-      } catch (err) {
-        console.warn("Failed to load dashboard data", err);
+        const response = await fetch(apiUrl("/api/dashboard"), { cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!ignore) setStats(data);
+      } catch (error) {
+        console.warn("Failed to load dashboard data", error);
       }
     }
 
     load();
+    window.addEventListener("focus", load);
     return () => {
       ignore = true;
+      window.removeEventListener("focus", load);
     };
   }, []);
 
   return (
     <AppLayout
       title="Dashboard"
-      subtitle="Overview of leave activity across all departments"
-      actions={<Button size="sm" className="hidden sm:inline-flex"><Download className="h-4 w-4 mr-2" />Export</Button>}
+      subtitle="Leave tracking across 10 railway stations"
+      actions={
+        <Button asChild size="sm">
+          <Link to="/leave-requests">New Leave Request</Link>
+        </Button>
+      }
     >
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-        <StatCard label="Total Workers" value={stats.totalWorkers} icon={Users} tone="primary" />
-        <StatCard label="Present Today" value={stats.presentToday} icon={UserCheck} tone="success" trend={`${stats.totalWorkers ? Math.round((stats.presentToday / stats.totalWorkers) * 100) : 0}% attendance`} />
-        <StatCard label="On Leave Today" value={stats.onLeaveToday} icon={UserX} tone="warning" />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <StatCard label="Total Stations" value={stats.totalStations} icon={Building2} tone="primary" />
+        <StatCard label="Total Employees" value={stats.totalEmployees} icon={Users} tone="success" />
+        <StatCard
+          label="On Leave Today"
+          value={stats.employeesOnLeaveToday}
+          icon={CheckCircle2}
+          tone="warning"
+        />
+        <StatCard
+          label="Pending Requests"
+          value={stats.pendingLeaveRequests}
+          icon={Clock}
+          tone="destructive"
+        />
       </div>
 
-      <div className="mt-6">
-        <div className="rounded-2xl border border-border bg-card p-5 shadow-sm">
-          <h2 className="font-display text-lg font-bold mb-4">On Leave Today</h2>
-          <div className="space-y-3">
-            {onLeaveTodayList.length === 0 && <p className="text-sm text-muted-foreground">No workers on leave today.</p>}
-            {onLeaveTodayList.map((r) => (
-              <div key={r.id} className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/40">
-                <Avatar className="h-9 w-9 shrink-0"><AvatarFallback className="bg-primary/10 text-primary text-xs">{String(r.employeeName || "").split(" ").map((s: string) => s[0]).slice(0, 2).join("")}</AvatarFallback></Avatar>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-semibold truncate">{r.employeeName}</div>
-                  <div className="text-xs text-muted-foreground truncate">{r.emp?.department} · until {r.toDate}</div>
-                </div>
-              </div>
-            ))}
-          </div>
+      <div className="mt-6 rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+        <div className="p-5 border-b border-border">
+          <h2 className="font-display text-lg font-bold">Recently Approved Leaves</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/40 text-xs uppercase text-muted-foreground">
+              <tr>
+                <th className="text-left px-5 py-3 font-medium">Employee ID</th>
+                <th className="text-left px-5 py-3 font-medium">From</th>
+                <th className="text-left px-5 py-3 font-medium">To</th>
+                <th className="text-left px-5 py-3 font-medium">Days</th>
+                <th className="text-left px-5 py-3 font-medium">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stats.recentlyApprovedLeaves.map((leave) => (
+                <tr key={leave.id} className="border-t border-border hover:bg-muted/30">
+                  <td className="px-5 py-3 font-mono text-xs">{leave.employeeId}</td>
+                  <td className="px-5 py-3 whitespace-nowrap">{leave.fromDate}</td>
+                  <td className="px-5 py-3 whitespace-nowrap">{leave.toDate}</td>
+                  <td className="px-5 py-3 font-semibold">{leave.days}</td>
+                  <td className="px-5 py-3">
+                    <StatusBadge status={leave.status} />
+                  </td>
+                </tr>
+              ))}
+              {stats.recentlyApprovedLeaves.length === 0 && (
+                <tr>
+                  <td className="px-5 py-5 text-muted-foreground" colSpan={5}>
+                    No recently approved leaves.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
     </AppLayout>

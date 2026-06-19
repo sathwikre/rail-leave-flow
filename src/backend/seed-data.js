@@ -1,81 +1,113 @@
-const departments = ["Track Maintenance", "Signal & Telecom", "Locomotive", "Station Ops", "Electrical", "Mechanical"];
-const firstNames = ["Rajesh", "Amit", "Suresh", "Vikram", "Anil", "Ravi", "Manoj", "Deepak", "Sanjay", "Pradeep", "Arjun", "Karthik", "Naveen", "Rahul", "Vinod", "Mahesh", "Kiran", "Sunil", "Ajay", "Rohit"];
-const lastNames = ["Kumar", "Singh", "Sharma", "Patel", "Yadav", "Verma", "Reddy", "Nair", "Iyer", "Gupta", "Mishra", "Joshi", "Chauhan", "Pandey", "Das"];
-const reasons = [
-  "Family function at home town",
-  "Medical appointment",
-  "Sister's wedding",
-  "Personal work",
-  "Child's school admission",
-  "Health issue - fever",
-  "Festival celebration",
-  "Father unwell",
-  "Religious ceremony",
-  "Property matters",
+import { Employee } from "./models/employeeModel.js";
+import { LeaveRequest } from "./models/leaveRequestModel.js";
+import { Station } from "./models/stationModel.js";
+
+const stationNames = [
+  "Station A",
+  "Station B",
+  "Station C",
+  "Station D",
+  "Station E",
+  "Station F",
+  "Station G",
+  "Station H",
+  "Station I",
+  "Station J",
 ];
 
-function seededRandom(seed) {
-  let s = seed;
-  return () => {
-    s = (s * 9301 + 49297) % 233280;
-    return s / 233280;
-  };
+const designations = ["Station Master", "Technician", "Track Maintainer", "Signal Operator"];
+const names = [
+  "Rajesh Kumar",
+  "Amit Singh",
+  "Suresh Sharma",
+  "Vikram Patel",
+  "Anil Yadav",
+  "Ravi Verma",
+  "Manoj Reddy",
+  "Deepak Nair",
+  "Sanjay Iyer",
+  "Pradeep Gupta",
+  "Arjun Mishra",
+  "Karthik Joshi",
+  "Naveen Chauhan",
+  "Rahul Pandey",
+  "Vinod Das",
+  "Mahesh Kumar",
+  "Kiran Singh",
+  "Sunil Sharma",
+  "Ajay Patel",
+  "Rohit Yadav",
+];
+
+export async function seedIfEmpty() {
+  const stationCount = await Station.countDocuments();
+  if (stationCount > 0) return;
+
+  const stations = await Station.insertMany(
+    stationNames.map((stationName, index) => ({
+      stationName,
+      stationMaster: names[index],
+      totalEmployees: 0,
+    })),
+  );
+
+  const employees = [];
+  for (let index = 0; index < names.length; index += 1) {
+    const station = stations[index % stations.length];
+    employees.push({
+      employeeId: `RW-${String(index + 1001).padStart(4, "0")}`,
+      name: names[index],
+      phone: `+91 98765 ${String(43000 + index).padStart(5, "0")}`,
+      designation: designations[index % designations.length],
+      stationId: station._id,
+    });
+  }
+
+  await Employee.insertMany(employees);
+  await Promise.all(
+    stations.map((station) =>
+      Station.findByIdAndUpdate(station._id, {
+        totalEmployees: employees.filter(
+          (employee) => String(employee.stationId) === String(station._id),
+        ).length,
+      }),
+    ),
+  );
+
+  const today = todayDateString();
+  await LeaveRequest.insertMany([
+    {
+      employeeId: "RW-1001",
+      fromDate: today,
+      toDate: today,
+      days: 1,
+      reason: "Personal work",
+      status: "Approved",
+    },
+    {
+      employeeId: "RW-1002",
+      fromDate: today,
+      toDate: addDays(today, 1),
+      days: 2,
+      reason: "Family function",
+      status: "Pending",
+    },
+  ]);
 }
 
-const rng = seededRandom(42);
-const pick = (items) => items[Math.floor(rng() * items.length)];
-const pad = (n, l = 2) => String(n).padStart(l, "0");
-const dateStr = (d) => d.toISOString().slice(0, 10);
-const addDays = (d, n) => {
-  const x = new Date(d);
-  x.setDate(x.getDate() + n);
-  return x;
-};
+function todayDateString() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
 
-export function buildSeedData() {
-  const now = new Date();
-
-  const employees = Array.from({ length: 36 }, (_, i) => {
-    const firstName = pick(firstNames);
-    const lastName = pick(lastNames);
-    const joinYear = 2010 + Math.floor(rng() * 14);
-
-    return {
-      id: `RW-${pad(1001 + i, 4)}`,
-      name: `${firstName} ${lastName}`,
-      phone: `+91 ${pad(70000 + Math.floor(rng() * 29999), 5)} ${pad(Math.floor(rng() * 99999), 5)}`,
-      department: pick(departments),
-      joiningDate: `${joinYear}-${pad(1 + Math.floor(rng() * 12))}-${pad(1 + Math.floor(rng() * 28))}`,
-      leaveUsedThisMonth: Math.floor(rng() * 5),
-      active: true,
-      createdAt: now,
-      updatedAt: now,
-    };
-  });
-
-  const leaveRequests = Array.from({ length: 22 }, (_, i) => {
-    const employee = employees[Math.floor(rng() * employees.length)];
-    const offset = Math.floor(rng() * 30) - 10;
-    const from = addDays(now, offset);
-    const days = 1 + Math.floor(rng() * 4);
-    const to = addDays(from, days - 1);
-    const statusRoll = rng();
-    const status = statusRoll < 0.4 ? "pending" : statusRoll < 0.75 ? "approved" : "rejected";
-
-    return {
-      id: `LR-${pad(2001 + i, 4)}`,
-      employeeId: employee.id,
-      employeeName: employee.name,
-      fromDate: dateStr(from),
-      toDate: dateStr(to),
-      days,
-      reason: pick(reasons),
-      requestDate: dateStr(addDays(from, -2 - Math.floor(rng() * 3))),
-      status,
-      createdAt: now,
-      updatedAt: now,
-    };
-  });
-
-  return { employees, leaveRequests };
+function addDays(value, days) {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + days);
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
