@@ -42,6 +42,28 @@ export async function leavesUsedThisMonth(employeeId) {
   return leaves.reduce((total, leave) => total + overlapDays(leave.fromDate, leave.toDate, start, end), 0);
 }
 
+// Return total approved leave days for the employee starting this month (simple sum)
+export async function getLeavesUsedThisMonth(employeeId) {
+  const now = new Date();
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const start = formatDate(startOfMonth);
+
+  const leaves = await LeaveRequest.find({
+    employeeId,
+    status: "Approved",
+    fromDate: { $gte: start },
+  }).lean();
+
+  return leaves.reduce((sum, l) => sum + (Number(l.days) || 0), 0);
+}
+
+export async function getLatestLeave(employeeId, excludeId = null) {
+  const query = { employeeId, status: "Approved" };
+  if (excludeId) query._id = { $ne: excludeId };
+  const latest = await LeaveRequest.findOne(query).sort({ toDate: -1 }).lean();
+  return latest ? latest.toDate : null;
+}
+
 export function lastLeaveDate(leaves) {
   const approved = leaves
     .filter((leave) => leave.status === "Approved")

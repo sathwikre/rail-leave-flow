@@ -69,8 +69,11 @@ function EmployeesPage() {
     ]);
     const stationData = stationRes.ok ? await stationRes.json() : [];
     const employeeData = employeeRes.ok ? await employeeRes.json() : [];
+    // Filter out incomplete employee records on the client as a safety net
+    const isComplete = (e: any) => e && e.employeeId && e.stationId && e.designation;
+    const completeEmployees = Array.isArray(employeeData) ? employeeData.filter(isComplete) : [];
     setStations(stationData);
-    setEmployees(employeeData);
+    setEmployees(completeEmployees);
     setForm((current) => ({ ...current, stationId: current.stationId || stationData[0]?.id || "" }));
   }
 

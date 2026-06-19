@@ -1,11 +1,20 @@
 import { Employee } from "../models/employeeModel.js";
 import { LeaveRequest } from "../models/leaveRequestModel.js";
-import { diffDays, lastLeaveDate, leavesUsedThisMonth, MONTHLY_LEAVE_LIMIT } from "./leaveMetrics.js";
+import {
+  diffDays,
+  lastLeaveDate,
+  leavesUsedThisMonth,
+  MONTHLY_LEAVE_LIMIT,
+  getLeavesUsedThisMonth,
+  getLatestLeave,
+} from "./leaveMetrics.js";
 import { getRecommendation } from "../services/leaveAnalysisService.js";
 
 export async function getLeaves(req, res) {
   const status = normalizeStatus(req.query.status);
-  const filter = status ? { status } : {};
+  // Only return leaves that originated from email; UI should show email requests only
+  const filter = { source: "Email" };
+  if (status) filter.status = status;
   const leaves = await LeaveRequest.find(filter).sort({ createdAt: -1 }).lean();
   const employees = await Employee.find({
     employeeId: { $in: leaves.map((leave) => leave.employeeId) },
@@ -29,6 +38,29 @@ export async function getLeaveById(req, res) {
   formatted.employeeName = employee?.name ?? leave.employeeId;
   formatted.designation = employee?.designation;
   res.json(formatted);
+}
+
+export async function getLeaveAnalysis(req, res) {
+  const leave = await LeaveRequest.findById(req.params.id).lean();
+  if (!leave) return res.status(404).json({ message: "Leave request not found" });
+
+  try {
+    const latestLeaveDate = await getLatestLeave(leave.employeeId, leave._id);
+    const currentLeaves = await getLeavesUsedThisMonth(leave.employeeId);
+    const requestedDays = Number(leave.days) || 0;
+    const totalAfterApproval = currentLeaves + requestedDays;
+
+    return res.json({
+      latestLeaveDate,
+      currentLeaves,
+      requestedDays,
+      totalAfterApproval,
+      exceededLimit: totalAfterApproval > MONTHLY_LEAVE_LIMIT,
+    });
+  } catch (err) {
+    console.warn("Failed to compute leave analysis:", err);
+    return res.status(500).json({ message: "Failed to compute leave analysis" });
+  }
 }
 
 export async function createLeave(req, res) {
@@ -68,24 +100,48 @@ export async function createLeave(req, res) {
 }
 
 export async function approveLeave(req, res) {
-  const leave = await LeaveRequest.findByIdAndUpdate(
-    req.params.id,
-    { status: "Approved" },
-    { new: true },
-  ).lean();
+  const force = String(req.query.force ?? "").toLowerCase() === "true";
+
+  const leave = await LeaveRequest.findById(req.params.id).lean();
   if (!leave) return res.status(404).json({ message: "Leave request not found" });
 
   try {
+    // Calculate current approved leaves for this employee this month
+    const currentLeaves = await getLeavesUsedThisMonth(leave.employeeId);
+    const requestedDays = Number(leave.days) || 0;
+    const totalAfterApproval = currentLeaves + requestedDays;
+
+    // debug logs to aid verification
+    console.log("approveLeave: currentLeaves=", currentLeaves);
+    console.log("approveLeave: requestedDays=", requestedDays);
+    console.log("approveLeave: totalAfterApproval=", totalAfterApproval);
+
+    if (totalAfterApproval > MONTHLY_LEAVE_LIMIT && !force) {
+      // Return a warning payload to the client — do not auto-reject or change DB
+      return res.json({
+        warning: true,
+        currentLeaves,
+        requestedDays,
+        totalAfterApproval,
+      });
+    }
+
+    // Proceed with approval (force or within limit)
+    const applied = await LeaveRequest.findByIdAndUpdate(
+      leave._id,
+      { status: "Approved" },
+      { new: true },
+    ).lean();
+
     const analysis = await getApprovedLeaveAnalysis(leave.employeeId);
-    const updatedLeave = await LeaveRequest.findByIdAndUpdate(leave._id, analysis, {
+    const updatedLeave = await LeaveRequest.findByIdAndUpdate(applied._id, analysis, {
       new: true,
     }).lean();
     return res.json(formatLeave(updatedLeave));
   } catch (err) {
     console.warn("Failed to update analysis on approve:", err);
+    return res.status(500).json({ message: "Failed to approve leave" });
   }
-
-  res.json(formatLeave(leave));
 }
 
 export async function rejectLeave(req, res) {

@@ -4,6 +4,16 @@ import { useEffect, useState } from "react";
 import { AppLayout, StatusBadge } from "@/components/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogAction,
+  AlertDialogCancel,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/leave-requests/$id")({
   head: () => ({ meta: [{ title: "Leave Request - Railway LMS" }] }),
@@ -32,6 +42,7 @@ function LeaveRequestDetail() {
   const { id } = Route.useParams();
   const [leave, setLeave] = useState<LeaveDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [warning, setWarning] = useState<null | { latestLeaveDate?: string | null; currentLeaves: number; requestedDays: number; totalAfterApproval: number; exceeded?: boolean }>(null);
 
   useEffect(() => {
     let ignore = false;
@@ -53,11 +64,38 @@ function LeaveRequestDetail() {
 
   async function setStatus(action: "approve" | "reject") {
     if (!leave) return;
-    const res = await fetch(apiUrl(`/api/leave/${leave.id}/${action}`), { method: "PATCH" });
-    if (!res.ok) return alert(`Unable to ${action} leave request`);
+    if (action === "approve") {
+      // fetch analysis first
+      const res = await fetch(apiUrl(`/api/leave/${leave.id}/analysis`));
+      if (!res.ok) return alert(`Unable to fetch leave analysis`);
+      const analysis = await res.json();
+      setWarning({ latestLeaveDate: analysis.latestLeaveDate, currentLeaves: analysis.currentLeaves, requestedDays: analysis.requestedDays, totalAfterApproval: analysis.totalAfterApproval, exceeded: analysis.exceededLimit });
+      return;
+    }
+
+    // reject
+    const res = await fetch(apiUrl(`/api/leave/${leave.id}/reject`), { method: "PATCH" });
+    if (!res.ok) return alert(`Unable to reject leave request`);
     const updated = await res.json();
     setLeave(updated);
-    alert(action === "approve" ? "Leave approved" : "Leave rejected");
+    alert("Leave rejected");
+  }
+
+  async function approveAnyway() {
+    if (!leave || !warning) return;
+    // re-check analysis to decide whether to force
+    const analysisRes = await fetch(apiUrl(`/api/leave/${leave.id}/analysis`));
+    if (!analysisRes.ok) return alert("Unable to fetch leave analysis");
+    const analysis = await analysisRes.json();
+    const force = analysis.totalAfterApproval > 4;
+    const res = await fetch(apiUrl(`/api/leave/${leave.id}/approve${force ? "?force=true" : ""}`), { method: "PATCH" });
+    if (!res.ok) return alert("Unable to approve leave request");
+    const updated = await res.json();
+    setWarning(null);
+    setLeave(updated);
+    alert("Leave approved");
+    // notify other views to refresh employee data
+    window.dispatchEvent(new CustomEvent("leave:approved", { detail: { employeeId: updated.employeeId } }));
   }
 
   if (loading) return (
@@ -137,12 +175,37 @@ function LeaveRequestDetail() {
         <div className="mt-6 flex gap-2">
           {leave.status === "Pending" && (
             <>
-              <Button onClick={() => setStatus("approve")}>Approve</Button>
-              <Button variant="outline" onClick={() => setStatus("reject")}>Reject</Button>
+                  <Button onClick={() => setStatus("approve")}>Approve</Button>
+                  <Button variant="outline" onClick={() => setStatus("reject")}>Reject</Button>
             </>
           )}
         </div>
       </div>
+          <AlertDialog open={Boolean(warning)} onOpenChange={(open) => !open && setWarning(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                    <AlertDialogTitle>{warning?.exceeded ? "Monthly Leave Limit Exceeded" : "Approve Leave"}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      <div className="space-y-2 text-sm">
+                        <div>Employee: <strong>{leave?.employeeName ?? leave?.employeeId}</strong></div>
+                        <div>Latest Leave Taken: <strong>{warning?.latestLeaveDate ?? "-"}</strong></div>
+                        <div>Leaves Used This Month: <strong>{warning?.currentLeaves} days</strong></div>
+                        <div>Requested Days: <strong>{warning?.requestedDays} days</strong></div>
+                        <div>Total After Approval: <strong>{warning?.totalAfterApproval} days</strong></div>
+                        {warning?.exceeded ? (
+                          <div className="mt-2 text-destructive font-semibold">⚠ Monthly Leave Limit Exceeded</div>
+                        ) : (
+                          <div className="mt-2 text-muted-foreground">Do you want to approve?</div>
+                        )}
+                      </div>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={approveAnyway}>{warning?.exceeded ? "Approve Anyway" : "Approve"}</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
     </AppLayout>
   );
 }

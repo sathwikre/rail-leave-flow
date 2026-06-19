@@ -164,10 +164,19 @@ export async function seedIfEmpty() {
       days,
       reason,
       status,
-      source: "Manual",
+      // Seed sample leave requests as coming from email
+      source: "Email",
     }));
 
     await LeaveRequest.insertMany(leaveDocs);
+
+    // One-time cleanup: remove any existing manual leave requests so UI shows only email requests
+    try {
+      await LeaveRequest.deleteMany({ source: "Manual" });
+      console.log("Removed legacy Manual leave requests during seed cleanup");
+    } catch (e) {
+      console.warn("Failed to delete Manual leave requests during seed cleanup:", e.message || e);
+    }
   }
 }
 

@@ -52,8 +52,14 @@ function EmployeeProfile() {
     }
 
     load();
+    const onApproved = (e: any) => {
+      if (e?.detail?.employeeId === id) load();
+    };
+    window.addEventListener("leave:approved", onApproved as EventListener);
+
     return () => {
       ignore = true;
+      window.removeEventListener("leave:approved", onApproved as EventListener);
     };
   }, [id]);
 

@@ -18,6 +18,15 @@ export async function getEmployees(req, res) {
     ];
   }
 
+  // Ensure only complete employee records are returned
+  const required = {
+    employeeId: { $exists: true, $ne: "" },
+    stationId: { $exists: true, $ne: null },
+    designation: { $exists: true, $ne: "" },
+  };
+
+  Object.assign(filter, required);
+
   const employees = await Employee.find(filter).populate("stationId").sort({ employeeId: 1 }).lean();
   res.json(employees.map(formatEmployee));
 }
@@ -25,6 +34,11 @@ export async function getEmployees(req, res) {
 export async function getEmployeeById(req, res) {
   const employee = await Employee.findOne({ employeeId: req.params.id }).populate("stationId").lean();
   if (!employee) return res.status(404).json({ message: "Employee not found" });
+
+  // Treat incomplete records as not found
+  if (!employee.employeeId || !employee.stationId || !employee.designation) {
+    return res.status(404).json({ message: "Employee not found" });
+  }
 
   const history = await LeaveRequest.find({ employeeId: employee.employeeId })
     .sort({ fromDate: -1 })
@@ -34,7 +48,7 @@ export async function getEmployeeById(req, res) {
   res.json({
     ...formatEmployee(employee),
     leavesUsedThisMonth: leavesUsed,
-    remainingLeaves: MONTHLY_LEAVE_LIMIT - leavesUsed,
+    remainingLeaves: Math.max(0, MONTHLY_LEAVE_LIMIT - leavesUsed),
     lastLeaveDate: lastLeaveDate(history),
     leaveHistory: history.map(formatLeave),
     monthlyLeaveLimitExceeded: leavesUsed > MONTHLY_LEAVE_LIMIT,
@@ -43,7 +57,11 @@ export async function getEmployeeById(req, res) {
 
 export async function getEmployeesByStation(req, res) {
   console.log("getEmployeesByStation called with stationId:", req.params.stationId);
-  const employees = await Employee.find({ stationId: req.params.stationId })
+  const employees = await Employee.find({
+    stationId: req.params.stationId,
+    employeeId: { $exists: true, $ne: "" },
+    designation: { $exists: true, $ne: "" },
+  })
     .sort({ employeeId: 1 })
     .lean();
   console.log(`getEmployeesByStation found ${employees.length} employees`);

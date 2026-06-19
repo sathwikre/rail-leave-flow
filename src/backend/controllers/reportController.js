@@ -11,7 +11,11 @@ import {
 export async function getStationReport(_req, res) {
   const [stations, employees] = await Promise.all([
     Station.find().sort({ stationName: 1 }).lean(),
-    Employee.find().lean(),
+    Employee.find({
+      employeeId: { $exists: true, $ne: "" },
+      stationId: { $exists: true, $ne: null },
+      designation: { $exists: true, $ne: "" },
+    }).lean(),
   ]);
   const today = todayDateString();
 
@@ -48,7 +52,11 @@ export async function getStationReport(_req, res) {
 }
 
 export async function getEmployeeReport(_req, res) {
-  const employees = await Employee.find().sort({ employeeId: 1 }).lean();
+  const employees = await Employee.find({
+    employeeId: { $exists: true, $ne: "" },
+    stationId: { $exists: true, $ne: null },
+    designation: { $exists: true, $ne: "" },
+  }).sort({ employeeId: 1 }).lean();
   const rows = await Promise.all(
     employees.map(async (employee) => {
       const [leavesUsed, history] = await Promise.all([
