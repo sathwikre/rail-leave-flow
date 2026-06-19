@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, UserCheck, UserRound, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
@@ -10,10 +10,12 @@ export const Route = createFileRoute("/stations/$id")({
 });
 
 type StationEmployee = {
+  id?: string;
   employeeId: string;
   name: string;
   designation: string;
   phone: string;
+  stationId?: string;
 };
 
 type Station = {
@@ -22,24 +24,57 @@ type Station = {
   stationMaster: string;
   totalEmployees: number;
   employeesOnLeave: number;
-  employees: StationEmployee[];
 };
 
 function StationDetailPage() {
   const { id } = Route.useParams();
+  const navigate = useNavigate();
   const [station, setStation] = useState<Station | null>(null);
+  const [employees, setEmployees] = useState<StationEmployee[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let ignore = false;
 
     async function loadStation() {
       try {
-        const response = await fetch(apiUrl(`/api/stations/${id}`), { cache: "no-store" });
-        if (!response.ok) return;
-        const data = await response.json();
-        if (!ignore) setStation(data);
+        const [stationResponse, employeeResponse] = await Promise.all([
+          fetch(apiUrl(`/api/stations/${id}`), { cache: "no-store" }),
+          fetch(apiUrl(`/api/employees/station/${id}`), { cache: "no-store" }),
+        ]);
+
+        if (!stationResponse.ok) {
+          console.warn("Station fetch returned non-ok status", stationResponse.status);
+          if (!ignore) {
+            setStation(null);
+            setEmployees([]);
+          }
+          return;
+        }
+
+        const data = await stationResponse.json();
+        console.log("Station fetched:", data);
+
+        let stationEmployees: StationEmployee[] = [];
+        if (employeeResponse.ok) {
+          stationEmployees = await employeeResponse.json();
+        } else {
+          console.warn("Employees fetch returned non-ok status", employeeResponse.status);
+        }
+        console.log("Employees fetched:", stationEmployees);
+
+        if (!ignore) {
+          setStation(data);
+          setEmployees(stationEmployees);
+        }
       } catch (error) {
         console.warn("Unable to load station.", error);
+        if (!ignore) {
+          setStation(null);
+          setEmployees([]);
+        }
+      } finally {
+        if (!ignore) setLoading(false);
       }
     }
 
@@ -49,10 +84,24 @@ function StationDetailPage() {
     };
   }, [id]);
 
-  if (!station) {
+  if (loading) {
     return (
       <AppLayout title="Station">
         <p className="text-sm text-muted-foreground">Loading station...</p>
+      </AppLayout>
+    );
+  }
+
+  if (!station) {
+    return (
+      <AppLayout title="Station">
+        <Link
+          to="/stations"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4"
+        >
+          <ArrowLeft className="h-4 w-4" /> Back to stations
+        </Link>
+        <p className="text-sm text-muted-foreground">Station not found.</p>
       </AppLayout>
     );
   }
@@ -77,26 +126,37 @@ function StationDetailPage() {
           <h2 className="font-display text-lg font-bold">Employees</h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/40 text-xs uppercase text-muted-foreground">
-              <tr>
-                <th className="text-left px-5 py-3 font-medium">Employee ID</th>
-                <th className="text-left px-5 py-3 font-medium">Employee Name</th>
-                <th className="text-left px-5 py-3 font-medium">Designation</th>
-                <th className="text-left px-5 py-3 font-medium">Phone Number</th>
-              </tr>
-            </thead>
-            <tbody>
-              {station.employees.map((employee) => (
-                <tr key={employee.employeeId} className="border-t border-border hover:bg-muted/30">
-                  <td className="px-5 py-3 font-mono text-xs">{employee.employeeId}</td>
-                  <td className="px-5 py-3 font-semibold">{employee.name}</td>
-                  <td className="px-5 py-3">{employee.designation}</td>
-                  <td className="px-5 py-3">{employee.phone}</td>
+          {employees.length === 0 ? (
+            <div className="p-6 text-sm text-muted-foreground">No employees found for this station</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="text-left px-5 py-3 font-medium">Employee ID</th>
+                  <th className="text-left px-5 py-3 font-medium">Employee Name</th>
+                  <th className="text-left px-5 py-3 font-medium">Designation</th>
+                  <th className="text-left px-5 py-3 font-medium">Phone Number</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {employees.map((employee) => (
+                  <tr
+                    key={employee.employeeId}
+                    className="border-t border-border hover:bg-muted/30 cursor-pointer"
+                    onClick={() => {
+                      console.log("Selected employee:", employee.employeeId);
+                      navigate({ to: "/employees/$id", params: { id: employee.employeeId } });
+                    }}
+                  >
+                    <td className="px-5 py-3 font-mono text-xs">{employee.employeeId}</td>
+                    <td className="px-5 py-3 font-semibold">{employee.name}</td>
+                    <td className="px-5 py-3">{employee.designation}</td>
+                    <td className="px-5 py-3">{employee.phone}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </AppLayout>

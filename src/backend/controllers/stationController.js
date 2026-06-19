@@ -10,6 +10,7 @@ export async function getStations(_req, res) {
 }
 
 export async function getStationById(req, res) {
+  console.log("getStationById called with id:", req.params.id);
   const station = await Station.findById(req.params.id).lean();
   if (!station) return res.status(404).json({ message: "Station not found" });
 
@@ -17,6 +18,7 @@ export async function getStationById(req, res) {
     stationSummary(station),
     Employee.find({ stationId: station._id }).sort({ employeeId: 1 }).lean(),
   ]);
+  console.log(`Found ${employees.length} employees for station ${req.params.id}`);
 
   res.json({
     ...summary,

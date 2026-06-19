@@ -9,7 +9,7 @@ import {
   ClipboardList,
   MapPin,
 } from "lucide-react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -26,27 +26,6 @@ const nav = [
 
 function SidebarBody({ onNav }: { onNav?: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const [stations, setStations] = useState<Array<{ id: string; stationName: string }>>([]);
-
-  useEffect(() => {
-    let ignore = false;
-
-    async function loadStations() {
-      try {
-        const response = await fetch(apiUrl("/api/stations"), { cache: "no-store" });
-        if (!response.ok) return;
-        const data = await response.json();
-        if (!ignore && Array.isArray(data)) setStations(data);
-      } catch (error) {
-        console.warn("Unable to load stations for sidebar.", error);
-      }
-    }
-
-    loadStations();
-    return () => {
-      ignore = true;
-    };
-  }, []);
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -79,30 +58,6 @@ function SidebarBody({ onNav }: { onNav?: () => void }) {
                 <item.icon className="h-4 w-4 shrink-0" />
                 <span className="truncate">{item.label}</span>
               </Link>
-              {item.to === "/stations" && stations.length > 0 && (
-                <div className="mt-1 mb-2 ml-6 space-y-1">
-                  {stations.map((station) => {
-                    const stationPath = `/stations/${station.id}`;
-                    const stationActive = pathname === stationPath;
-                    return (
-                      <Link
-                        key={station.id}
-                        to="/stations/$id"
-                        params={{ id: station.id }}
-                        onClick={onNav}
-                        className={cn(
-                          "block rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                          stationActive
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                            : "text-sidebar-foreground/65 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-                        )}
-                      >
-                        <span className="truncate">{station.stationName}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              )}
             </div>
           );
         })}
@@ -203,11 +158,6 @@ export function AppLayout({
       </div>
     </div>
   );
-}
-
-function apiUrl(path: string) {
-  const apiBase = import.meta.env?.VITE_API_BASE ?? "";
-  return apiBase ? `${apiBase.replace(/\/$/, "")}${path}` : path;
 }
 
 export function StatusBadge({

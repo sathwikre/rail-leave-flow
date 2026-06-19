@@ -12,6 +12,18 @@ const leaveRequestSchema = new mongoose.Schema({
     default: "Pending",
     index: true,
   },
+  source: {
+    type: String,
+    enum: ["Manual", "Email"],
+    default: "Manual",
+    index: true,
+  },
+  // Analysis fields (optional snapshot stored at creation time)
+  latestLeaveDate: { type: String, match: /^\d{4}-\d{2}-\d{2}$/, required: false },
+  leavesUsedThisMonth: { type: Number, required: false, min: 0 },
+  remainingLeaves: { type: Number, required: false },
+  totalAfterApproval: { type: Number, required: false },
+  recommendation: { type: String, enum: ["APPROVE", "REJECT"], required: false },
   createdAt: { type: Date, default: Date.now },
 });
 

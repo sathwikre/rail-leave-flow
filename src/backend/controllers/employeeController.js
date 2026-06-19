@@ -42,9 +42,11 @@ export async function getEmployeeById(req, res) {
 }
 
 export async function getEmployeesByStation(req, res) {
+  console.log("getEmployeesByStation called with stationId:", req.params.stationId);
   const employees = await Employee.find({ stationId: req.params.stationId })
     .sort({ employeeId: 1 })
     .lean();
+  console.log(`getEmployeesByStation found ${employees.length} employees`);
   res.json(employees.map(formatEmployee));
 }
 

@@ -15,6 +15,7 @@ import { Route as LeaveRequestsRouteImport } from './routes/leave-requests'
 import { Route as EmployeesRouteImport } from './routes/employees'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as StationsIdRouteImport } from './routes/stations.$id'
+import { Route as LeaveRequestsIdRouteImport } from './routes/leave-requests.$id'
 import { Route as EmployeesIdRouteImport } from './routes/employees.$id'
 
 const StationsRoute = StationsRouteImport.update({
@@ -47,6 +48,11 @@ const StationsIdRoute = StationsIdRouteImport.update({
   path: '/$id',
   getParentRoute: () => StationsRoute,
 } as any)
+const LeaveRequestsIdRoute = LeaveRequestsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => LeaveRequestsRoute,
+} as any)
 const EmployeesIdRoute = EmployeesIdRouteImport.update({
   id: '/$id',
   path: '/$id',
@@ -56,29 +62,32 @@ const EmployeesIdRoute = EmployeesIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/employees': typeof EmployeesRouteWithChildren
-  '/leave-requests': typeof LeaveRequestsRoute
+  '/leave-requests': typeof LeaveRequestsRouteWithChildren
   '/reports': typeof ReportsRoute
   '/stations': typeof StationsRouteWithChildren
   '/employees/$id': typeof EmployeesIdRoute
+  '/leave-requests/$id': typeof LeaveRequestsIdRoute
   '/stations/$id': typeof StationsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/employees': typeof EmployeesRouteWithChildren
-  '/leave-requests': typeof LeaveRequestsRoute
+  '/leave-requests': typeof LeaveRequestsRouteWithChildren
   '/reports': typeof ReportsRoute
   '/stations': typeof StationsRouteWithChildren
   '/employees/$id': typeof EmployeesIdRoute
+  '/leave-requests/$id': typeof LeaveRequestsIdRoute
   '/stations/$id': typeof StationsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/employees': typeof EmployeesRouteWithChildren
-  '/leave-requests': typeof LeaveRequestsRoute
+  '/leave-requests': typeof LeaveRequestsRouteWithChildren
   '/reports': typeof ReportsRoute
   '/stations': typeof StationsRouteWithChildren
   '/employees/$id': typeof EmployeesIdRoute
+  '/leave-requests/$id': typeof LeaveRequestsIdRoute
   '/stations/$id': typeof StationsIdRoute
 }
 export interface FileRouteTypes {
@@ -90,6 +99,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/stations'
     | '/employees/$id'
+    | '/leave-requests/$id'
     | '/stations/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -99,6 +109,7 @@ export interface FileRouteTypes {
     | '/reports'
     | '/stations'
     | '/employees/$id'
+    | '/leave-requests/$id'
     | '/stations/$id'
   id:
     | '__root__'
@@ -108,13 +119,14 @@ export interface FileRouteTypes {
     | '/reports'
     | '/stations'
     | '/employees/$id'
+    | '/leave-requests/$id'
     | '/stations/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   EmployeesRoute: typeof EmployeesRouteWithChildren
-  LeaveRequestsRoute: typeof LeaveRequestsRoute
+  LeaveRequestsRoute: typeof LeaveRequestsRouteWithChildren
   ReportsRoute: typeof ReportsRoute
   StationsRoute: typeof StationsRouteWithChildren
 }
@@ -163,6 +175,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof StationsIdRouteImport
       parentRoute: typeof StationsRoute
     }
+    '/leave-requests/$id': {
+      id: '/leave-requests/$id'
+      path: '/$id'
+      fullPath: '/leave-requests/$id'
+      preLoaderRoute: typeof LeaveRequestsIdRouteImport
+      parentRoute: typeof LeaveRequestsRoute
+    }
     '/employees/$id': {
       id: '/employees/$id'
       path: '/$id'
@@ -185,6 +204,18 @@ const EmployeesRouteWithChildren = EmployeesRoute._addFileChildren(
   EmployeesRouteChildren,
 )
 
+interface LeaveRequestsRouteChildren {
+  LeaveRequestsIdRoute: typeof LeaveRequestsIdRoute
+}
+
+const LeaveRequestsRouteChildren: LeaveRequestsRouteChildren = {
+  LeaveRequestsIdRoute: LeaveRequestsIdRoute,
+}
+
+const LeaveRequestsRouteWithChildren = LeaveRequestsRoute._addFileChildren(
+  LeaveRequestsRouteChildren,
+)
+
 interface StationsRouteChildren {
   StationsIdRoute: typeof StationsIdRoute
 }
@@ -200,7 +231,7 @@ const StationsRouteWithChildren = StationsRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   EmployeesRoute: EmployeesRouteWithChildren,
-  LeaveRequestsRoute: LeaveRequestsRoute,
+  LeaveRequestsRoute: LeaveRequestsRouteWithChildren,
   ReportsRoute: ReportsRoute,
   StationsRoute: StationsRouteWithChildren,
 }

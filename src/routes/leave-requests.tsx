@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AppLayout, StatusBadge } from "@/components/AppLayout";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -20,6 +21,7 @@ type LeaveRequest = {
   days: number;
   reason: string;
   status: "Pending" | "Approved" | "Rejected";
+  source?: "Manual" | "Email";
 };
 
 function LeaveRequestsPage() {
@@ -37,6 +39,8 @@ function LeaveRequestsPage() {
 
   useEffect(() => {
     loadRequests();
+    const iv = setInterval(loadRequests, 30000);
+    return () => clearInterval(iv);
   }, []);
 
   async function loadRequests() {
@@ -80,11 +84,16 @@ function LeaveRequestsPage() {
   return (
     <AppLayout
       title="Leave Requests"
-      subtitle="Manual entries from worker WhatsApp requests"
+        subtitle="Manual entries from worker WhatsApp requests"
       actions={
-        <Button size="sm" onClick={() => setShowForm((value) => !value)}>
-          <Plus className="h-4 w-4 mr-2" /> New Request
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button size="sm" onClick={() => loadRequests()}>
+            Refresh
+          </Button>
+          <Button size="sm" onClick={() => setShowForm((value) => !value)}>
+            <Plus className="h-4 w-4 mr-2" /> New Request
+          </Button>
+        </div>
       }
     >
       {showForm && (
@@ -126,6 +135,7 @@ function LeaveRequestsPage() {
             <thead className="bg-muted/40 text-xs uppercase text-muted-foreground">
               <tr>
                 <th className="text-left px-5 py-3 font-medium">Employee</th>
+                  <th className="text-left px-5 py-3 font-medium">Source</th>
                 <th className="text-left px-5 py-3 font-medium">From</th>
                 <th className="text-left px-5 py-3 font-medium">To</th>
                 <th className="text-left px-5 py-3 font-medium">Days</th>
@@ -143,6 +153,17 @@ function LeaveRequestsPage() {
                     </Link>
                     <div className="text-xs font-mono text-muted-foreground">{request.employeeId}</div>
                   </td>
+                    <td className="px-5 py-3">
+                      {request.source === "Email" ? (
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-100">
+                          Email
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="bg-muted/10 text-muted-foreground border-border">
+                          Manual
+                        </Badge>
+                      )}
+                    </td>
                   <td className="px-5 py-3 whitespace-nowrap">{request.fromDate}</td>
                   <td className="px-5 py-3 whitespace-nowrap">{request.toDate}</td>
                   <td className="px-5 py-3 font-semibold">{request.days}</td>
