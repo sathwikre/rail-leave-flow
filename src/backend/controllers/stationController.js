@@ -2,6 +2,7 @@ import { Employee } from "../models/employeeModel.js";
 import { LeaveRequest } from "../models/leaveRequestModel.js";
 import { Station } from "../models/stationModel.js";
 import { todayDateString } from "./leaveMetrics.js";
+import * as employeeStats from "../services/employeeStatsService.js";
 
 export async function getStations(_req, res) {
   const stations = await Station.find().sort({ stationName: 1 }).lean();
@@ -19,7 +20,9 @@ export async function getStationById(req, res) {
     Employee.find({
       stationId: station._id,
       employeeId: { $exists: true, $ne: "" },
+      name: { $exists: true, $ne: "" },
       designation: { $exists: true, $ne: "" },
+      phone: { $exists: true, $ne: "" },
     }).sort({ employeeId: 1 }).lean(),
   ]);
   console.log(`Found ${employees.length} employees for station ${req.params.id}`);
@@ -31,28 +34,15 @@ export async function getStationById(req, res) {
 }
 
 async function stationSummary(station) {
-  const employees = await Employee.find({
-    stationId: station._id,
-    employeeId: { $exists: true, $ne: "" },
-    designation: { $exists: true, $ne: "" },
-  }).select("employeeId").lean();
-  const employeeIds = employees.map((employee) => employee.employeeId);
-  const today = todayDateString();
-  const onLeave = employeeIds.length
-    ? await LeaveRequest.distinct("employeeId", {
-        employeeId: { $in: employeeIds },
-        status: "Approved",
-        fromDate: { $lte: today },
-        toDate: { $gte: today },
-      })
-    : [];
+  const employeesCount = await employeeStats.getEmployeesCountForStation(station._id);
+  const onLeaveCount = await employeeStats.getEmployeesOnLeaveForStation(station._id);
 
   return {
     id: String(station._id),
     stationName: station.stationName,
     stationMaster: station.stationMaster,
-    totalEmployees: employees.length,
-    employeesOnLeave: onLeave.length,
+    totalEmployees: employeesCount,
+    employeesOnLeave: onLeaveCount,
   };
 }
 

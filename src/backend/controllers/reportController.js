@@ -8,6 +8,8 @@ import {
   todayDateString,
 } from "./leaveMetrics.js";
 
+import { getLatestLeave } from "./leaveMetrics.js";
+
 export async function getStationReport(_req, res) {
   const [stations, employees] = await Promise.all([
     Station.find().sort({ stationName: 1 }).lean(),
@@ -15,6 +17,8 @@ export async function getStationReport(_req, res) {
       employeeId: { $exists: true, $ne: "" },
       stationId: { $exists: true, $ne: null },
       designation: { $exists: true, $ne: "" },
+      name: { $exists: true, $ne: "" },
+      phone: { $exists: true, $ne: "" },
     }).lean(),
   ]);
   const today = todayDateString();
@@ -56,6 +60,8 @@ export async function getEmployeeReport(_req, res) {
     employeeId: { $exists: true, $ne: "" },
     stationId: { $exists: true, $ne: null },
     designation: { $exists: true, $ne: "" },
+    name: { $exists: true, $ne: "" },
+    phone: { $exists: true, $ne: "" },
   }).sort({ employeeId: 1 }).lean();
   const rows = await Promise.all(
     employees.map(async (employee) => {
@@ -75,4 +81,58 @@ export async function getEmployeeReport(_req, res) {
   );
 
   res.json(rows);
+}
+
+export async function getStationById(req, res) {
+  const stationId = req.params.id;
+  const station = await Station.findById(stationId).lean();
+  if (!station) return res.status(404).json({ error: "Station not found" });
+
+  const employees = await Employee.find({
+    stationId: station._id,
+    employeeId: { $exists: true, $ne: "" },
+    designation: { $exists: true, $ne: "" },
+    name: { $exists: true, $ne: "" },
+    phone: { $exists: true, $ne: "" },
+  })
+    .sort({ employeeId: 1 })
+    .lean();
+
+  const today = todayDateString();
+
+  const employeeDetails = await Promise.all(
+    employees.map(async (employee) => {
+      const leavesUsed = await leavesUsedThisMonth(employee.employeeId);
+      const latest = await getLatestLeave(employee.employeeId);
+      return {
+        employeeId: employee.employeeId,
+        name: employee.name,
+        designation: employee.designation,
+        leavesUsedThisMonth: leavesUsed,
+        latestLeaveDate: latest,
+        exceededLimit: leavesUsed > MONTHLY_LEAVE_LIMIT,
+      };
+    }),
+  );
+
+  const employeeIds = employees.map((e) => e.employeeId);
+  const onLeaveIds = employeeIds.length
+    ? await LeaveRequest.distinct("employeeId", {
+        employeeId: { $in: employeeIds },
+        status: "Approved",
+        fromDate: { $lte: today },
+        toDate: { $gte: today },
+      })
+    : [];
+
+  const exceedingCount = employeeDetails.filter((e) => e.exceededLimit).length;
+
+  res.json({
+    stationName: station.stationName,
+    stationMaster: station.stationMaster,
+    totalEmployees: employees.length,
+    employeesOnLeave: onLeaveIds.length,
+    employeesExceedingLimit: exceedingCount,
+    employees: employeeDetails,
+  });
 }

@@ -13,6 +13,7 @@ import { reportRoutes } from "./routes/reportRoutes.js";
 import { stationRoutes } from "./routes/stationRoutes.js";
 import { seedIfEmpty } from "./seed-data.js";
 import { todayDateString } from "./controllers/leaveMetrics.js";
+import * as employeeStats from "./services/employeeStatsService.js";
 
 export async function createApp() {
   await connectDatabase();
@@ -27,6 +28,7 @@ export async function createApp() {
   });
 
   app.get("/api/dashboard", dashboard);
+  app.get("/api/dashboard/on-leave-today", onLeaveToday);
   app.get("/dashboard", dashboard);
 
   mountRoutes(app, "/api");
@@ -64,15 +66,11 @@ function mountRoutes(app, prefix) {
 async function dashboard(_req, res) {
   res.set("Cache-Control", "no-store");
   const today = todayDateString();
-  const [totalStations, totalEmployees, employeesOnLeaveIds, pendingLeaveRequests, recentlyApproved] =
+  const [totalStations, totalEmployees, employeesOnLeaveToday, pendingLeaveRequests, recentlyApproved] =
     await Promise.all([
       Station.countDocuments(),
-      Employee.countDocuments(),
-      LeaveRequest.distinct("employeeId", {
-        status: "Approved",
-        fromDate: { $lte: today },
-        toDate: { $gte: today },
-      }),
+      employeeStats.getTotalEmployees(),
+      employeeStats.getEmployeesOnLeaveToday(),
       LeaveRequest.countDocuments({ status: "Pending" }),
       LeaveRequest.find({ status: "Approved" }).sort({ createdAt: -1 }).limit(5).lean(),
     ]);
@@ -80,7 +78,7 @@ async function dashboard(_req, res) {
   res.json({
     totalStations,
     totalEmployees,
-    employeesOnLeaveToday: employeesOnLeaveIds.length,
+    employeesOnLeaveToday,
     pendingLeaveRequests,
     recentlyApprovedLeaves: recentlyApproved.map((leave) => ({
       id: String(leave._id),
@@ -93,4 +91,14 @@ async function dashboard(_req, res) {
       createdAt: leave.createdAt,
     })),
   });
+}
+
+async function onLeaveToday(_req, res) {
+  res.set("Cache-Control", "no-store");
+  try {
+    const list = await employeeStats.getEmployeesOnLeaveTodayDetails();
+    res.json(list);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
 }

@@ -38,6 +38,12 @@ function ReportsPage() {
     }
 
     loadReports();
+    // Refresh reports when a leave is approved elsewhere
+    function onApproved() {
+      loadReports();
+    }
+    window.addEventListener("leave:approved", onApproved as EventListener);
+    return () => window.removeEventListener("leave:approved", onApproved as EventListener);
   }, []);
 
   return (
@@ -57,7 +63,9 @@ function ReportsPage() {
               <td className="px-5 py-3 font-semibold">{row.stationName}</td>
               <td className="px-5 py-3">{row.totalEmployees}</td>
               <td className="px-5 py-3">{row.employeesOnLeave}</td>
-              <td className="px-5 py-3">{row.employeesExceedingMonthlyLeaveLimit}</td>
+              <td className={`px-5 py-3 ${row.employeesExceedingMonthlyLeaveLimit > 0 ? "text-destructive font-semibold" : ""}`}>
+                {row.employeesExceedingMonthlyLeaveLimit}
+              </td>
             </tr>
           ))}
         </tbody>

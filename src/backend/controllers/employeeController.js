@@ -23,6 +23,8 @@ export async function getEmployees(req, res) {
     employeeId: { $exists: true, $ne: "" },
     stationId: { $exists: true, $ne: null },
     designation: { $exists: true, $ne: "" },
+    name: { $exists: true, $ne: "" },
+    phone: { $exists: true, $ne: "" },
   };
 
   Object.assign(filter, required);
@@ -60,7 +62,9 @@ export async function getEmployeesByStation(req, res) {
   const employees = await Employee.find({
     stationId: req.params.stationId,
     employeeId: { $exists: true, $ne: "" },
+    name: { $exists: true, $ne: "" },
     designation: { $exists: true, $ne: "" },
+    phone: { $exists: true, $ne: "" },
   })
     .sort({ employeeId: 1 })
     .lean();
@@ -86,7 +90,9 @@ export async function createEmployee(req, res) {
 }
 
 export async function syncStationTotal(stationId) {
-  const totalEmployees = await Employee.countDocuments({ stationId });
+  // Use employeeStats service to count only valid employees for the station
+  const { getEmployeesCountForStation } = await import("../services/employeeStatsService.js");
+  const totalEmployees = await getEmployeesCountForStation(stationId);
   await Station.findByIdAndUpdate(stationId, { totalEmployees });
 }
 

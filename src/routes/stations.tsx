@@ -50,7 +50,11 @@ function StationsPage() {
         const response = await fetch(apiUrl("/api/stations"), { cache: "no-store" });
         if (!response.ok) return;
         const data = await response.json();
-        if (!ignore) setStations(data);
+        if (!ignore) {
+          setStations(data);
+          const total = data.reduce((s: any, it: any) => s + (it.totalEmployees || 0), 0);
+          console.log("Stations total employees:", total);
+        }
       } catch (error) {
         console.warn("Unable to load stations.", error);
       }

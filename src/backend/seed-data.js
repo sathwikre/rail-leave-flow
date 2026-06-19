@@ -1,6 +1,7 @@
 import { Employee } from "./models/employeeModel.js";
 import { LeaveRequest } from "./models/leaveRequestModel.js";
 import { Station } from "./models/stationModel.js";
+import * as employeeStats from "./services/employeeStatsService.js";
 
 const stationsData = [
   { name: "Station A", master: "Rajesh Kumar" },
@@ -140,13 +141,12 @@ export async function seedIfEmpty() {
     }
   }
 
-  // recompute station totals
+  // recompute station totals using the same valid-employee criteria
   await Promise.all(
-    stations.map((station) =>
-      Employee.countDocuments({ stationId: station._id }).then((count) =>
-        Station.findByIdAndUpdate(station._id, { totalEmployees: count }),
-      ),
-    ),
+    stations.map(async (station) => {
+      const count = await employeeStats.getEmployeesCountForStation(station._id);
+      return Station.findByIdAndUpdate(station._id, { totalEmployees: count });
+    }),
   );
 
   // create leave requests if there are fewer than 20
