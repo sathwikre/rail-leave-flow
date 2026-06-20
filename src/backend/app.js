@@ -1,7 +1,5 @@
 import cors from "cors";
 import express from "express";
-import fs from "fs";
-import path from "path";
 import { connectDatabase } from "./db.js";
 import { errorHandler, notFound } from "./errors.js";
 import { LeaveRequest } from "./models/leaveRequestModel.js";
@@ -128,24 +126,10 @@ export async function createApp() {
   mountRoutes(app, "/api");
   mountRoutes(app, "");
 
-  const distPath = path.join(process.cwd(), "dist", "client");
+  app.use("/api", (_req, _res, next) => {
+    next(notFound("API route not found"));
+  });
 
-console.log("cwd =", process.cwd());
-console.log("distPath =", distPath);
-console.log(
-  "index exists =",
-  fs.existsSync(path.join(distPath, "index.html"))
-);
-
-app.use(express.static(distPath));
-
-app.use("/api", (_req, _res, next) => {
-  next(notFound("API route not found"));
-});
-
-app.get(/^(?!\/api).*/, (_req, res) => {
-  res.sendFile(path.join(distPath, "index.html"));
-});
   app.use(errorHandler);
 
   return app;
