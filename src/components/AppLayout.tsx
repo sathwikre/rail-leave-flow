@@ -71,7 +71,8 @@ function SidebarBody({ onNav }: { onNav?: () => void }) {
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold truncate">Traffic Inspector/TX</div>
+            <div className="text-sm font-semibold truncate">Traffic Inspector/HX</div>
+            <div className="text-xs text-sidebar-foreground/60 truncate">A Raja Gopal</div>
           </div>
         </div>
       </div>

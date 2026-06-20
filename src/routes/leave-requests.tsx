@@ -34,6 +34,7 @@ type LeaveRequest = {
   id: string;
   employeeId: string;
   employeeName?: string;
+  stationName?: string;
   fromDate: string;
   toDate: string;
   days: number;
@@ -370,6 +371,9 @@ function LeaveRequestsPage() {
                       {request.employeeName ?? request.employeeId}
                     </Link>
                     <div className="text-xs font-mono text-muted-foreground">{request.employeeId}</div>
+                    {request.stationName && (
+                      <div className="text-xs text-muted-foreground">{request.stationName}</div>
+                    )}
                   </td>
                     <td className="px-5 py-3">
                       {request.source === "Email" ? (

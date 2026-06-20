@@ -33,6 +33,7 @@ export async function getLeaves(req, res) {
       ...formatLeave(leave),
       employeeName: employeeById.get(leave.employeeId)?.name ?? leave.employeeId,
       designation: employeeById.get(leave.employeeId)?.designation,
+      stationName: employeeById.get(leave.employeeId)?.stationName,
     })),
   );
 }
@@ -44,6 +45,7 @@ export async function getLeaveById(req, res) {
   const formatted = formatLeave(leave);
   formatted.employeeName = employee?.name ?? leave.employeeId;
   formatted.designation = employee?.designation;
+  formatted.stationName = employee?.stationName;
   res.json(formatted);
 }
 
@@ -134,6 +136,7 @@ export async function createLeave(req, res) {
     ...formatLeave(leave.toObject()),
     employeeName: employee.name,
     designation: employee.designation,
+    stationName: employee.stationName,
   });
 }
 
