@@ -67,12 +67,11 @@ function SidebarBody({ onNav }: { onNav?: () => void }) {
         <div className="flex items-center gap-3">
           <Avatar className="h-9 w-9">
             <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-xs">
-              MS
+              TI
             </AvatarFallback>
           </Avatar>
           <div className="min-w-0 flex-1">
-            <div className="text-sm font-semibold truncate">M. Subramaniam</div>
-            <div className="text-xs text-sidebar-foreground/60 truncate">Railway Manager</div>
+            <div className="text-sm font-semibold truncate">Traffic Inspector/TX</div>
           </div>
         </div>
       </div>
@@ -149,7 +148,7 @@ export function AppLayout({
               {actions}
               <Avatar className="h-8 w-8">
                 <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                  MS
+                  TI
                 </AvatarFallback>
               </Avatar>
             </div>
