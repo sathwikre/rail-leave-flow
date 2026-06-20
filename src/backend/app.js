@@ -29,6 +29,27 @@ export async function createApp() {
 
   app.get("/api/dashboard", dashboard);
   app.get("/api/dashboard/on-leave-today", onLeaveToday);
+  app.get("/api/dashboard/on-leave", async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    const date = String(req.query.date ?? "").trim() || undefined;
+    try {
+      const list = await employeeStats.getEmployeesOnLeaveDetails(date);
+      res.json(list);
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+  app.get("/api/dashboard/sick-leaves", async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    const date = String(req.query.date ?? "").trim() || undefined;
+    try {
+      const list = await employeeStats.getSickLeavesList(date);
+      res.json(list);
+    } catch (err) {
+      res.status(500).json({ error: String(err) });
+    }
+  });
+  app.get("/api/dashboard/stats", dashboardStats);
   app.get("/dashboard", dashboard);
 
   mountRoutes(app, "/api");
@@ -98,6 +119,30 @@ async function onLeaveToday(_req, res) {
   try {
     const list = await employeeStats.getEmployeesOnLeaveTodayDetails();
     res.json(list);
+  } catch (err) {
+    res.status(500).json({ error: String(err) });
+  }
+}
+
+async function dashboardStats(_req, res) {
+  res.set("Cache-Control", "no-store");
+  try {
+    const [totalStations, totalEmployees, onLeaveToday, pendingRequests] = await Promise.all([
+      Station.countDocuments(),
+      employeeStats.getTotalEmployees(),
+      employeeStats.getEmployeesOnLeaveToday(),
+      LeaveRequest.countDocuments({ status: "Pending" }),
+    ]);
+
+    // debug log for pending requests count
+    console.log("pendingRequests=", await LeaveRequest.countDocuments({ status: "Pending" }));
+
+    res.json({
+      totalStations,
+      totalEmployees,
+      onLeaveToday,
+      pendingRequests,
+    });
   } catch (err) {
     res.status(500).json({ error: String(err) });
   }

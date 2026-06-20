@@ -6,6 +6,8 @@ const leaveRequestSchema = new mongoose.Schema({
   toDate: { type: String, required: true, match: /^\d{4}-\d{2}-\d{2}$/ },
   days: { type: Number, required: true, min: 1 },
   reason: { type: String, required: true, trim: true },
+  reasonType: { type: String, required: false, trim: true },
+  customReason: { type: String, required: false, trim: true },
   status: {
     type: String,
     enum: ["Pending", "Approved", "Rejected"],

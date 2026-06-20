@@ -12,10 +12,17 @@ import { getRecommendation } from "../services/leaveAnalysisService.js";
 
 export async function getLeaves(req, res) {
   const status = normalizeStatus(req.query.status);
-  // Only return leaves that originated from email; UI should show email requests only
-  const filter = { source: "Email" };
+  // Return all leave requests (both Email and Manual). Allow optional status filter.
+  const filter = {};
   if (status) filter.status = status;
   const leaves = await LeaveRequest.find(filter).sort({ createdAt: -1 }).lean();
+
+  // Debug: log how many leaves were fetched and a sample of sources
+  try {
+    console.log(`getLeaves: fetched ${leaves.length} leave(s). sources=`, [...new Set(leaves.map((l) => l.source))]);
+  } catch (e) {
+    // ignore logging errors
+  }
   const employees = await Employee.find({
     employeeId: { $in: leaves.map((leave) => leave.employeeId) },
   }).lean();
@@ -63,20 +70,51 @@ export async function getLeaveAnalysis(req, res) {
   }
 }
 
+export async function prospectiveAnalysis(req, res) {
+  const { employeeId, fromDate, toDate, days } = req.body || {};
+  if (!employeeId) return res.status(400).json({ message: "employeeId is required" });
+  try {
+    const requestedDays = Number(days ?? (fromDate && toDate ? diffDays(fromDate, toDate) : 0)) || 0;
+    const analysis = await getRecommendation(employeeId, requestedDays);
+    return res.json({
+      latestLeaveDate: analysis.latestLeaveDate,
+      currentLeaves: analysis.leavesUsedThisMonth,
+      requestedDays: requestedDays,
+      totalAfterApproval: analysis.totalAfterApproval,
+      exceededLimit: analysis.totalAfterApproval > MONTHLY_LEAVE_LIMIT,
+    });
+  } catch (err) {
+    console.warn("Failed to compute prospective analysis:", err);
+    return res.status(500).json({ message: "Failed to compute leave analysis" });
+  }
+}
+
 export async function createLeave(req, res) {
   const employee = await Employee.findOne({ employeeId: req.body.employeeId }).lean();
   if (!employee) return res.status(404).json({ message: "Employee not found" });
 
   const days = diffDays(req.body.fromDate, req.body.toDate);
+  const reasonType = req.body.reasonType ?? req.body.reason ?? "Other";
+  const customReason = req.body.customReason ?? null;
+  const reasonToStore = reasonType === "Others" ? (customReason || "Others") : reasonType;
   const leave = await LeaveRequest.create({
     employeeId: req.body.employeeId,
     fromDate: req.body.fromDate,
     toDate: req.body.toDate,
     days,
-    reason: req.body.reason,
+    reason: reasonToStore,
+    reasonType,
+    customReason,
     status: "Pending",
     source: "Manual",
   });
+
+  // Debug: log saved manual leave
+  try {
+    console.log("Manual request saved", { id: String(leave._id), employeeId: leave.employeeId, source: leave.source });
+  } catch (e) {
+    // ignore
+  }
 
   // compute analysis snapshot and save to leave
   try {
@@ -201,6 +239,8 @@ function formatLeave(leave) {
     toDate: leave.toDate,
     days: leave.days,
     reason: leave.reason,
+    reasonType: leave.reasonType ?? null,
+    customReason: leave.customReason ?? null,
     status: leave.status,
     source: leave.source ?? "Manual",
     latestLeaveDate: leave.latestLeaveDate ?? null,

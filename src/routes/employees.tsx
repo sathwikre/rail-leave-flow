@@ -1,10 +1,17 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { Building2, Phone, Search } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AppLayout } from "@/components/AppLayout";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -33,6 +40,26 @@ type Employee = {
 const designations = ["Station Master", "Technician", "Track Maintainer", "Signal Operator"];
 
 function EmployeesPage() {
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [employeeLeaves, setEmployeeLeaves] = useState<any | null>(null);
+  const [employeeModalOpen, setEmployeeModalOpen] = useState(false);
+  const [employeeLeavesLoading, setEmployeeLeavesLoading] = useState(false);
+
+  async function openEmployeeModal(employee: Employee) {
+    setSelectedEmployee(employee);
+    setEmployeeModalOpen(true);
+    setEmployeeLeavesLoading(true);
+    try {
+      const res = await fetch(apiUrl(`/api/employees/${employee.employeeId}/leaves`), { cache: "no-store" });
+      const data = res.ok ? await res.json() : null;
+      setEmployeeLeaves(data);
+    } catch (err) {
+      console.error("Failed to load employee leaves", err);
+      setEmployeeLeaves(null);
+    } finally {
+      setEmployeeLeavesLoading(false);
+    }
+  }
   const [q, setQ] = useState("");
   const [stationId, setStationId] = useState("all");
   const [stations, setStations] = useState<Station[]>([]);
@@ -138,6 +165,74 @@ function EmployeesPage() {
           {showForm ? "Cancel" : "Add Employee"}
         </Button>
       </div>
+      <Dialog open={employeeModalOpen} onOpenChange={setEmployeeModalOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Employee Leave History</DialogTitle>
+            <DialogDescription>
+              {selectedEmployee ? `${selectedEmployee.name} · ${selectedEmployee.employeeId}` : ""}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="overflow-x-auto">
+            {employeeLeavesLoading ? (
+              <div className="p-6 text-sm text-muted-foreground">Loading...</div>
+            ) : !employeeLeaves ? (
+              <div className="p-6 text-sm text-muted-foreground">No leave records found.</div>
+            ) : (
+              <div>
+                <div className="grid grid-cols-2 gap-2 text-sm mb-4">
+                  <div>Name: <strong>{employeeLeaves.employeeName}</strong></div>
+                  <div>Employee ID: <strong>{employeeLeaves.employeeId}</strong></div>
+                  <div>Designation: <strong>{employeeLeaves.designation}</strong></div>
+                  <div>Station: <strong>{employeeLeaves.stationName ?? "-"}</strong></div>
+                  <div>Phone: <strong>{employeeLeaves.phone ?? "-"}</strong></div>
+                  <div>Latest Leave Date: <strong>{employeeLeaves.latestLeaveDate ?? "-"}</strong></div>
+                  <div>Leaves Used This Month: <strong>{employeeLeaves.leavesUsedThisMonth ?? 0}</strong></div>
+                  <div>Current Status: <strong>{employeeLeaves.currentStatus ?? "Present"}</strong></div>
+                </div>
+
+                <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+                  <div className="p-5 border-b border-border">
+                    <h3 className="font-display text-lg font-bold">Leave History</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/40 text-xs uppercase text-muted-foreground">
+                        <tr>
+                          <th className="text-left px-5 py-3 font-medium">From Date</th>
+                          <th className="text-left px-5 py-3 font-medium">To Date</th>
+                          <th className="text-left px-5 py-3 font-medium">Days</th>
+                          <th className="text-left px-5 py-3 font-medium">Reason</th>
+                          <th className="text-left px-5 py-3 font-medium">Status</th>
+                          <th className="text-left px-5 py-3 font-medium">Source</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(employeeLeaves.leaveHistory || []).map((leave: any) => (
+                          <tr key={leave.id} className="border-t border-border hover:bg-muted/30">
+                            <td className="px-5 py-3 whitespace-nowrap">{leave.fromDate}</td>
+                            <td className="px-5 py-3 whitespace-nowrap">{leave.toDate}</td>
+                            <td className="px-5 py-3 font-semibold">{leave.days}</td>
+                            <td className="px-5 py-3 text-muted-foreground">{leave.reasonType ?? leave.reason ?? "-"}</td>
+                            <td className="px-5 py-3">{leave.status}</td>
+                            <td className="px-5 py-3 text-muted-foreground">{leave.source ?? "Manual"}</td>
+                          </tr>
+                        ))}
+                        {(employeeLeaves.leaveHistory || []).length === 0 && (
+                          <tr>
+                            <td className="px-5 py-5 text-muted-foreground" colSpan={6}>No leave records found.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {showForm && (
         <div className="mb-6 rounded-lg border border-border bg-card p-4">
@@ -196,11 +291,13 @@ function EmployeesPage() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {filtered.map((employee) => (
-          <Link
+          <div
             key={employee.employeeId}
-            to="/employees/$id"
-            params={{ id: employee.employeeId }}
-            className="group rounded-2xl border border-border bg-card p-5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all"
+            role="button"
+            tabIndex={0}
+            onClick={() => openEmployeeModal(employee)}
+            onKeyDown={(e) => (e.key === "Enter" ? openEmployeeModal(employee) : null)}
+            className="group rounded-2xl border border-border bg-card p-5 shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all cursor-pointer"
           >
             <div className="flex items-start gap-3">
               <Avatar className="h-12 w-12 shrink-0">
@@ -226,7 +323,7 @@ function EmployeesPage() {
                 <span className="truncate">{employee.phone}</span>
               </div>
             </div>
-          </Link>
+            </div>
         ))}
       </div>
     </AppLayout>

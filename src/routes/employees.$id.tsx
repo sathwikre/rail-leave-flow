@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Building2, Phone, User } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppLayout, StatusBadge } from "@/components/AppLayout";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
@@ -17,6 +17,7 @@ type LeaveHistory = {
   days: number;
   reason: string;
   status: LeaveStatus;
+  source?: string;
 };
 
 type EmployeeProfileData = {
@@ -25,48 +26,58 @@ type EmployeeProfileData = {
   phone: string;
   designation: string;
   stationName: string;
-  leavesUsedThisMonth: number;
-  remainingLeaves: number;
-  lastLeaveDate: string | null;
-  monthlyLeaveLimitExceeded: boolean;
-  leaveHistory: LeaveHistory[];
+  leavesUsedThisMonth?: number;
+  remainingLeaves?: number;
+  lastLeaveDate?: string | null;
+  monthlyLeaveLimitExceeded?: boolean;
+  leaveHistory?: LeaveHistory[];
+  totalLeavesTaken?: number;
+  currentStatus?: string;
 };
 
 function EmployeeProfile() {
-  const { id } = Route.useParams();
+  const params = Route.useParams();
+  const id = (params as any).id as string | undefined;
+
   const [employee, setEmployee] = useState<EmployeeProfileData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let ignore = false;
-
     async function load() {
+      console.log("EmployeeDetails: fetching", id);
+      setLoading(true);
       try {
-        const response = await fetch(apiUrl(`/api/employees/${id}`), { cache: "no-store" });
-        if (!response.ok) return;
-        const data = await response.json();
+        if (!id) return;
+        const res = await fetch(apiUrl(`/api/employees/${id}`), { cache: "no-store" });
+        if (!res.ok) {
+          console.warn("EmployeeDetails: fetch failed", res.status);
+          if (!ignore) setEmployee(null);
+          return;
+        }
+        const data = await res.json();
+        console.log("EmployeeDetails: data", data);
         if (!ignore) setEmployee(data);
+      } catch (err) {
+        console.error("EmployeeDetails: error", err);
+        if (!ignore) setEmployee(null);
       } finally {
         if (!ignore) setLoading(false);
       }
     }
-
     load();
-    const onApproved = (e: any) => {
-      if (e?.detail?.employeeId === id) load();
-    };
-    window.addEventListener("leave:approved", onApproved as EventListener);
-
     return () => {
       ignore = true;
-      window.removeEventListener("leave:approved", onApproved as EventListener);
     };
   }, [id]);
+
+  console.log("Employee ID:", id);
+  console.log("Employee Data:", employee);
 
   if (loading) {
     return (
       <AppLayout title="Employee Profile">
-        <p className="text-sm text-muted-foreground">Loading employee...</p>
+        <p className="text-sm text-muted-foreground">Loading employee details...</p>
       </AppLayout>
     );
   }
@@ -74,17 +85,25 @@ function EmployeeProfile() {
   if (!employee) {
     return (
       <AppLayout title="Not Found">
-        <p>Employee not found</p>
+        <p className="text-sm text-muted-foreground">Employee not found</p>
       </AppLayout>
     );
   }
 
+  const leaveHistory = (employee.leaveHistory || []).slice().sort((a, b) => {
+    const da = Date.parse(a.fromDate || "");
+    const db = Date.parse(b.fromDate || "");
+    return db - da;
+  });
+
+  const totalLeavesTaken = leaveHistory.length ? leaveHistory.reduce((s, l) => s + (l.days || 0), 0) : 0;
+  const leavesThisMonth = employee.leavesUsedThisMonth ?? 0;
+  const longestLeave = leaveHistory.length ? Math.max(...leaveHistory.map((l) => l.days || 0)) : 0;
+  const latestLeaveDate = leaveHistory[0]?.toDate ?? employee.lastLeaveDate ?? "-";
+
   return (
     <AppLayout title={employee.name} subtitle={employee.stationName}>
-      <Link
-        to="/employees"
-        className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4"
-      >
+      <Link to="/employees" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-4">
         <ArrowLeft className="h-4 w-4" /> Back to employees
       </Link>
 
@@ -106,14 +125,11 @@ function EmployeeProfile() {
 
         <div className="lg:col-span-2 space-y-6">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <Stat label="Used This Month" value={employee.leavesUsedThisMonth} />
-            <Stat
-              label="Remaining Leaves"
-              value={employee.remainingLeaves}
-              tone={employee.remainingLeaves >= 0 ? "success" : "destructive"}
-            />
-            <Stat label="Monthly Limit" value={4} />
-            <Stat label="Last Leave Date" value={employee.lastLeaveDate ?? "-"} small />
+            <Stat label="Total Leaves Taken" value={totalLeavesTaken} />
+            <Stat label="Leaves Taken This Month" value={leavesThisMonth} />
+            <Stat label="Latest Leave Date" value={latestLeaveDate ?? "-"} small />
+            <Stat label="Longest Leave" value={longestLeave} />
+            <Stat label="Current Status" value={employee.currentStatus ?? "Present"} tone={employee.currentStatus === "On Leave" ? "destructive" : "success"} />
           </div>
 
           {employee.monthlyLeaveLimitExceeded && (
@@ -135,25 +151,23 @@ function EmployeeProfile() {
                     <th className="text-left px-5 py-3 font-medium">Days</th>
                     <th className="text-left px-5 py-3 font-medium">Reason</th>
                     <th className="text-left px-5 py-3 font-medium">Status</th>
+                    <th className="text-left px-5 py-3 font-medium">Source</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {employee.leaveHistory.map((leave) => (
+                  {leaveHistory.map((leave: any) => (
                     <tr key={leave.id} className="border-t border-border hover:bg-muted/30">
                       <td className="px-5 py-3 whitespace-nowrap">{leave.fromDate}</td>
                       <td className="px-5 py-3 whitespace-nowrap">{leave.toDate}</td>
                       <td className="px-5 py-3 font-semibold">{leave.days}</td>
                       <td className="px-5 py-3 text-muted-foreground">{leave.reason}</td>
-                      <td className="px-5 py-3">
-                        <StatusBadge status={leave.status} />
-                      </td>
+                      <td className="px-5 py-3"><StatusBadge status={leave.status} /></td>
+                      <td className="px-5 py-3 text-muted-foreground">{leave.source ?? "Manual"}</td>
                     </tr>
                   ))}
-                  {employee.leaveHistory.length === 0 && (
+                  {leaveHistory.length === 0 && (
                     <tr>
-                      <td className="px-5 py-5 text-muted-foreground" colSpan={5}>
-                        No leave history.
-                      </td>
+                      <td className="px-5 py-5 text-muted-foreground" colSpan={6}>No leave records found.</td>
                     </tr>
                   )}
                 </tbody>
@@ -180,35 +194,18 @@ function Row({ icon: Icon, label, value }: any) {
   );
 }
 
-function Stat({
-  label,
-  value,
-  tone,
-  small,
-}: {
-  label: string;
-  value: number | string;
-  tone?: "success" | "destructive";
-  small?: boolean;
-}) {
-  const className =
-    tone === "success" ? "text-success" : tone === "destructive" ? "text-destructive" : "";
+function Stat({ label, value, tone, small, }: { label: string; value: number | string; tone?: "success" | "destructive"; small?: boolean; }) {
+  const className = tone === "success" ? "text-success" : tone === "destructive" ? "text-destructive" : "";
   return (
     <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
       <p className="text-xs text-muted-foreground uppercase tracking-wider">{label}</p>
-      <p className={`font-display font-bold mt-1 ${small ? "text-lg" : "text-3xl"} ${className}`}>
-        {value}
-      </p>
+      <p className={`font-display font-bold mt-1 ${small ? "text-lg" : "text-3xl"} ${className}`}>{value}</p>
     </div>
   );
 }
 
 function initials(name: string) {
-  return name
-    .split(" ")
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join("");
+  return name ? name.split(" ").map((part) => part[0]).slice(0, 2).join("") : "";
 }
 
 function apiUrl(path: string) {

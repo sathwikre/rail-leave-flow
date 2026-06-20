@@ -1,8 +1,8 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { Building2, UserCheck, Users } from "lucide-react";
+import { Building2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
-import { StatCard } from "@/components/StatCard";
+// StatCard removed per UX change: top summary cards deleted
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -96,12 +96,6 @@ function StationsPage() {
 
   return (
     <AppLayout title="Stations" subtitle="10 stations managed from one leave desk">
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-        <StatCard label="Total Stations" value={stations.length} icon={Building2} tone="primary" />
-        <StatCard label="Total Employees" value={totalEmployees} icon={Users} tone="success" />
-        <StatCard label="On Leave Today" value={onLeave} icon={UserCheck} tone="warning" />
-      </div>
-
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         {stations.map((station) => (
           <div

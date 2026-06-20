@@ -78,6 +78,9 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  useEffect(() => {
+    console.log('RootComponent mounted');
+  }, []);
   return (
     <QueryClientProvider client={queryClient}>
       <Outlet />

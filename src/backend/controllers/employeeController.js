@@ -46,6 +46,10 @@ export async function getEmployeeById(req, res) {
     .sort({ fromDate: -1 })
     .lean();
   const leavesUsed = await leavesUsedThisMonth(employee.employeeId);
+  const totalLeavesTaken = await LeaveRequest.countDocuments({ employeeId: employee.employeeId, status: "Approved" });
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const onLeaveNow = await LeaveRequest.exists({ employeeId: employee.employeeId, status: "Approved", fromDate: { $lte: todayStr }, toDate: { $gte: todayStr } });
 
   res.json({
     ...formatEmployee(employee),
@@ -54,6 +58,9 @@ export async function getEmployeeById(req, res) {
     lastLeaveDate: lastLeaveDate(history),
     leaveHistory: history.map(formatLeave),
     monthlyLeaveLimitExceeded: leavesUsed > MONTHLY_LEAVE_LIMIT,
+    exceededLimit: leavesUsed > MONTHLY_LEAVE_LIMIT,
+    totalLeavesTaken,
+    currentStatus: onLeaveNow ? "On Leave" : "Present",
   });
 }
 
@@ -70,6 +77,30 @@ export async function getEmployeesByStation(req, res) {
     .lean();
   console.log(`getEmployeesByStation found ${employees.length} employees`);
   res.json(employees.map(formatEmployee));
+}
+
+export async function getEmployeeLeaves(req, res) {
+  const empId = req.params.id;
+  const employee = await Employee.findOne({ employeeId: empId }).populate("stationId").lean();
+  if (!employee) return res.status(404).json({ message: "Employee not found" });
+
+  const history = await LeaveRequest.find({ employeeId: empId }).sort({ fromDate: -1 }).lean();
+  const leavesUsed = await leavesUsedThisMonth(empId);
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const onLeaveNow = await LeaveRequest.exists({ employeeId: empId, status: "Approved", fromDate: { $lte: todayStr }, toDate: { $gte: todayStr } });
+
+  res.json({
+    employeeId: employee.employeeId,
+    employeeName: employee.name,
+    designation: employee.designation,
+    stationName: employee.stationId?.stationName ?? null,
+    phone: employee.phone,
+    latestLeaveDate: lastLeaveDate(history),
+    leavesUsedThisMonth: leavesUsed,
+    currentStatus: onLeaveNow ? "On Leave" : "Present",
+    leaveHistory: history.map(formatLeave),
+  });
 }
 
 export async function createEmployee(req, res) {
@@ -119,7 +150,10 @@ function formatLeave(leave) {
     toDate: leave.toDate,
     days: leave.days,
     reason: leave.reason,
+    reasonType: leave.reasonType ?? null,
+    customReason: leave.customReason ?? null,
     status: leave.status,
+    source: leave.source ?? "Manual",
     createdAt: leave.createdAt,
   };
 }
