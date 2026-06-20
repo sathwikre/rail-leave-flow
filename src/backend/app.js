@@ -1,5 +1,7 @@
 import cors from "cors";
 import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
 import { connectDatabase } from "./db.js";
 import { errorHandler, notFound } from "./errors.js";
 import { LeaveRequest } from "./models/leaveRequestModel.js";
@@ -129,9 +131,24 @@ export async function createApp() {
   app.use("/api", (_req, _res, next) => {
     next(notFound("API route not found"));
   });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-  app.use(errorHandler);
+const distPath = path.join(__dirname, "../../dist");
 
+// Serve static frontend files
+app.use(express.static(distPath));
+
+// Serve React app for all non-API routes
+app.use((req, res, next) => {
+  if (req.path.startsWith("/api")) {
+    return next();
+  }
+
+  res.sendFile(path.join(distPath, "index.html"));
+});
+
+app.use(errorHandler);
   return app;
 }
 
