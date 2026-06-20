@@ -1,8 +1,26 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft, Building2, Phone, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { AppLayout, StatusBadge } from "@/components/AppLayout";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export const Route = createFileRoute("/employees/$id")({
   head: () => ({ meta: [{ title: "Employee Profile - Railway LMS" }] }),
@@ -38,44 +56,103 @@ type EmployeeProfileData = {
   currentStatus?: string;
 };
 
+const designationOptions = [
+  "DY SS",
+  "SS",
+  "SM",
+  "SMR",
+  "APM",
+  "P/MAN",
+  "P/WOMAN",
+  "CTNC",
+  "SR.CLERK",
+  "S/MASTER",
+  "Other",
+];
+
 function EmployeeProfile() {
   const params = Route.useParams();
   const id = (params as any).id as string | undefined;
 
   const [employee, setEmployee] = useState<EmployeeProfileData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editOpen, setEditOpen] = useState(false);
+  const [designationChoice, setDesignationChoice] = useState("");
+  const [customDesignation, setCustomDesignation] = useState("");
+  const [savingDesignation, setSavingDesignation] = useState(false);
+
+  async function loadEmployee(options?: { silent?: boolean }) {
+    if (!id) return;
+    if (!options?.silent) setLoading(true);
+    try {
+      const res = await fetch(apiUrl(`/api/employees/${id}`), { cache: "no-store" });
+      if (!res.ok) {
+        setEmployee(null);
+        return;
+      }
+      const data = await res.json();
+      setEmployee(data);
+    } catch (err) {
+      console.error("EmployeeDetails: error", err);
+      setEmployee(null);
+    } finally {
+      if (!options?.silent) setLoading(false);
+    }
+  }
 
   useEffect(() => {
     let ignore = false;
-    async function load() {
-      console.log("EmployeeDetails: fetching", id);
-      setLoading(true);
-      try {
-        if (!id) return;
-        const res = await fetch(apiUrl(`/api/employees/${id}`), { cache: "no-store" });
-        if (!res.ok) {
-          console.warn("EmployeeDetails: fetch failed", res.status);
-          if (!ignore) setEmployee(null);
-          return;
-        }
-        const data = await res.json();
-        console.log("EmployeeDetails: data", data);
-        if (!ignore) setEmployee(data);
-      } catch (err) {
-        console.error("EmployeeDetails: error", err);
-        if (!ignore) setEmployee(null);
-      } finally {
-        if (!ignore) setLoading(false);
-      }
+    async function run() {
+      if (ignore) return;
+      await loadEmployee();
     }
-    load();
+    run();
     return () => {
       ignore = true;
     };
   }, [id]);
 
-  console.log("Employee ID:", id);
-  console.log("Employee Data:", employee);
+  function openDesignationEditor() {
+    if (!employee) return;
+    const known = designationOptions.includes(employee.designation);
+    setDesignationChoice(known ? employee.designation : "Other");
+    setCustomDesignation(known ? "" : employee.designation);
+    setEditOpen(true);
+  }
+
+  async function saveDesignation() {
+    if (!employee) return;
+    const nextDesignation = designationChoice === "Other" ? customDesignation.trim() : designationChoice;
+    if (!nextDesignation) {
+      toast.error("Please select or enter a designation");
+      return;
+    }
+
+    setSavingDesignation(true);
+    try {
+      const response = await fetch(apiUrl(`/api/employees/${employee.employeeId}/designation`), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ designation: nextDesignation }),
+      });
+
+      if (!response.ok) {
+        toast.error(`Failed to update designation: ${await response.text()}`);
+        return;
+      }
+
+      const updated = await response.json();
+      setEmployee((current) => current ? { ...current, designation: updated.designation } : current);
+      setEditOpen(false);
+      toast.success("Designation updated successfully.");
+      await loadEmployee({ silent: true });
+      window.dispatchEvent(new CustomEvent("app:refresh", {
+        detail: { pages: ["dashboard", "stations", "employees", "reports"] },
+      }));
+    } finally {
+      setSavingDesignation(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -120,13 +197,18 @@ function EmployeeProfile() {
           <h2 className="font-display text-xl font-bold mt-4">{employee.name}</h2>
           <p className="text-sm font-mono text-muted-foreground">{employee.employeeId}</p>
           <div className="mt-5 space-y-3 text-left">
-            <Row icon={Phone} label="Phone Number" value={employee.phone} />
-            <Row icon={User} label="Designation" value={employee.designation} />
+            <Row icon={User} label="Employee ID" value={employee.employeeId} />
+            <Row icon={User} label="Name" value={employee.name} />
+            <Row icon={User} label="Current Designation" value={employee.designation} />
             <Row icon={Building2} label="Station" value={employee.stationName} />
             <Row icon={User} label="DOB" value={employee.dob ?? "-"} />
-            <Row icon={User} label="DOA" value={employee.doa ?? "-"} />
             <Row icon={User} label="DOJ" value={employee.doj ?? "-"} />
+            <Row icon={User} label="DOA" value={employee.doa ?? "-"} />
+            <Row icon={Phone} label="Phone Number" value={employee.phone} />
           </div>
+          <Button className="mt-5 w-full" onClick={openDesignationEditor}>
+            Edit Designation
+          </Button>
         </div>
 
         <div className="lg:col-span-2 space-y-6">
@@ -182,6 +264,49 @@ function EmployeeProfile() {
           </div>
         </div>
       </div>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Designation</DialogTitle>
+            <DialogDescription>
+              Update only the designation for {employee.name}. Employee ID and station remain unchanged.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-lg bg-muted/40 px-3 py-2 text-sm">
+              Current Designation: <strong>{employee.designation}</strong>
+            </div>
+            <Select value={designationChoice} onValueChange={setDesignationChoice}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select designation" />
+              </SelectTrigger>
+              <SelectContent>
+                {designationOptions.map((designation) => (
+                  <SelectItem key={designation} value={designation}>
+                    {designation}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {designationChoice === "Other" && (
+              <Input
+                value={customDesignation}
+                onChange={(event) => setCustomDesignation(event.target.value)}
+                placeholder="Enter designation"
+              />
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={savingDesignation}>
+              Cancel
+            </Button>
+            <Button onClick={saveDesignation} disabled={savingDesignation}>
+              {savingDesignation ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 }

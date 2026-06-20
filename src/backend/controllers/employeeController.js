@@ -1,4 +1,5 @@
 import { Employee } from "../models/employeeModel.js";
+import { DesignationHistory } from "../models/designationHistoryModel.js";
 import { LeaveRequest } from "../models/leaveRequestModel.js";
 import { Station } from "../models/stationModel.js";
 import { lastLeaveDate, leavesUsedThisMonth, MONTHLY_LEAVE_LIMIT } from "./leaveMetrics.js";
@@ -129,6 +130,34 @@ export async function createEmployee(req, res) {
   res.status(201).json(formatEmployee(await Employee.findById(employee._id).lean()));
 }
 
+export async function updateEmployeeDesignation(req, res) {
+  const employeeId = String(req.params.employeeId ?? "").trim();
+  const designation = normalizeDesignation(req.body?.designation);
+
+  if (!employeeId) return res.status(400).json({ message: "Employee ID is required" });
+  if (!designation) return res.status(400).json({ message: "Designation is required" });
+
+  const existing = await Employee.findOne({ employeeId }).lean();
+  if (!existing) return res.status(404).json({ message: "Employee not found" });
+
+  const updated = await Employee.findOneAndUpdate(
+    { employeeId },
+    { designation },
+    { new: true },
+  ).lean();
+
+  if (existing.designation !== designation) {
+    await DesignationHistory.create({
+      employeeId,
+      oldDesignation: existing.designation,
+      newDesignation: designation,
+      changedAt: new Date(),
+    });
+  }
+
+  res.json(formatEmployee(updated));
+}
+
 export async function syncStationTotal(stationId) {
   // Use employeeStats service to count only valid employees for the station
   const { getEmployeesCountForStation } = await import("../services/employeeStatsService.js");
@@ -165,6 +194,25 @@ function formatLeave(leave) {
     source: leave.source ?? "Manual",
     createdAt: leave.createdAt,
   };
+}
+
+function normalizeDesignation(value) {
+  const compact = String(value ?? "").trim().replace(/\s+/g, " ");
+  const key = compact.toUpperCase().replace(/[./\s-]/g, "");
+  const normalized = {
+    DYSS: "DY SS",
+    PMAN: "P/MAN",
+    PWOMAN: "P/WOMAN",
+    SMR: "SMR",
+    SM: "SM",
+    SS: "SS",
+    APM: "APM",
+    SMASTER: "S/MASTER",
+    CTNC: "CTNC",
+    SRCLERK: "SR.CLERK",
+    SHGMASTER: "SHG-MASTER",
+  };
+  return normalized[key] ?? compact;
 }
 
 function escapeRegExp(value) {

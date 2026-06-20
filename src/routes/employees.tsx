@@ -9,6 +9,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -39,16 +40,16 @@ type Employee = {
 
 const designations = [
   "DY SS",
+  "SS",
+  "SM",
+  "SMR",
+  "APM",
   "P/MAN",
   "P/WOMAN",
-  "SMR",
-  "SM",
-  "SS",
-  "APM",
-  "S/MASTER",
-  "SHG MASTER",
   "CTNC",
   "SR.CLERK",
+  "S/MASTER",
+  "Other",
 ];
 
 function EmployeesPage() {
@@ -56,6 +57,10 @@ function EmployeesPage() {
   const [employeeLeaves, setEmployeeLeaves] = useState<any | null>(null);
   const [employeeModalOpen, setEmployeeModalOpen] = useState(false);
   const [employeeLeavesLoading, setEmployeeLeavesLoading] = useState(false);
+  const [editDesignationOpen, setEditDesignationOpen] = useState(false);
+  const [designationChoice, setDesignationChoice] = useState("");
+  const [customDesignation, setCustomDesignation] = useState("");
+  const [savingDesignation, setSavingDesignation] = useState(false);
 
   async function openEmployeeModal(employee: Employee) {
     setSelectedEmployee(employee);
@@ -70,6 +75,49 @@ function EmployeesPage() {
       setEmployeeLeaves(null);
     } finally {
       setEmployeeLeavesLoading(false);
+    }
+  }
+
+  function openDesignationEditor() {
+    const currentDesignation = employeeLeaves?.designation ?? selectedEmployee?.designation ?? "";
+    const known = designations.includes(currentDesignation);
+    setDesignationChoice(known ? currentDesignation : "Other");
+    setCustomDesignation(known ? "" : currentDesignation);
+    setEditDesignationOpen(true);
+  }
+
+  async function saveDesignation() {
+    const employeeId = employeeLeaves?.employeeId ?? selectedEmployee?.employeeId;
+    const nextDesignation = designationChoice === "Other" ? customDesignation.trim() : designationChoice;
+    if (!employeeId || !nextDesignation) {
+      toast.error("Please select or enter a designation");
+      return;
+    }
+
+    setSavingDesignation(true);
+    try {
+      const response = await fetch(apiUrl(`/api/employees/${employeeId}/designation`), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ designation: nextDesignation }),
+      });
+
+      if (!response.ok) {
+        toast.error(`Failed to update designation: ${await response.text()}`);
+        return;
+      }
+
+      const updated = await response.json();
+      setEmployeeLeaves((current: any) => current ? { ...current, designation: updated.designation } : current);
+      setSelectedEmployee((current) => current ? { ...current, designation: updated.designation } : current);
+      setEditDesignationOpen(false);
+      toast.success("Designation updated successfully.");
+      await load();
+      window.dispatchEvent(new CustomEvent("app:refresh", {
+        detail: { pages: ["dashboard", "stations", "employees", "reports"] },
+      }));
+    } finally {
+      setSavingDesignation(false);
     }
   }
   const [q, setQ] = useState("");
@@ -195,7 +243,7 @@ function EmployeesPage() {
       <Dialog open={employeeModalOpen} onOpenChange={setEmployeeModalOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>Employee Leave History</DialogTitle>
+            <DialogTitle>Employee Details</DialogTitle>
             <DialogDescription>
               {selectedEmployee ? `${selectedEmployee.name} · ${selectedEmployee.employeeId}` : ""}
             </DialogDescription>
@@ -209,18 +257,21 @@ function EmployeesPage() {
             ) : (
               <div>
                 <div className="grid grid-cols-2 gap-2 text-sm mb-4">
-                  <div>Name: <strong>{employeeLeaves.employeeName}</strong></div>
                   <div>Employee ID: <strong>{employeeLeaves.employeeId}</strong></div>
-                  <div>Designation: <strong>{employeeLeaves.designation}</strong></div>
+                  <div>Name: <strong>{employeeLeaves.employeeName}</strong></div>
+                  <div>Current Designation: <strong>{employeeLeaves.designation}</strong></div>
                   <div>Station: <strong>{employeeLeaves.stationName ?? "-"}</strong></div>
-                  <div>Phone: <strong>{employeeLeaves.phone ?? "-"}</strong></div>
                   <div>DOB: <strong>{employeeLeaves.dob ?? "-"}</strong></div>
-                  <div>DOA: <strong>{employeeLeaves.doa ?? "-"}</strong></div>
                   <div>DOJ: <strong>{employeeLeaves.doj ?? "-"}</strong></div>
+                  <div>DOA: <strong>{employeeLeaves.doa ?? "-"}</strong></div>
+                  <div>Phone: <strong>{employeeLeaves.phone ?? "-"}</strong></div>
                   <div>Latest Leave Date: <strong>{employeeLeaves.latestLeaveDate ?? "-"}</strong></div>
                   <div>Leaves Used This Month: <strong>{employeeLeaves.leavesUsedThisMonth ?? 0}</strong></div>
                   <div>Current Status: <strong>{employeeLeaves.currentStatus ?? "Present"}</strong></div>
                 </div>
+                <Button className="mb-4" onClick={openDesignationEditor}>
+                  Edit Designation
+                </Button>
 
                 <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
                   <div className="p-5 border-b border-border">
@@ -261,6 +312,49 @@ function EmployeesPage() {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={editDesignationOpen} onOpenChange={setEditDesignationOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Designation</DialogTitle>
+            <DialogDescription>
+              Update only the designation. Employee ID and station will not change.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-lg bg-muted/40 px-3 py-2 text-sm">
+              Current Designation: <strong>{employeeLeaves?.designation ?? selectedEmployee?.designation ?? "-"}</strong>
+            </div>
+            <Select value={designationChoice} onValueChange={setDesignationChoice}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select designation" />
+              </SelectTrigger>
+              <SelectContent>
+                {designations.filter((designation) => designation !== "Other").map((designation) => (
+                  <SelectItem key={designation} value={designation}>
+                    {designation}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {designationChoice === "Other" && (
+              <Input
+                value={customDesignation}
+                onChange={(event) => setCustomDesignation(event.target.value)}
+                placeholder="Enter designation"
+              />
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDesignationOpen(false)} disabled={savingDesignation}>
+              Cancel
+            </Button>
+            <Button onClick={saveDesignation} disabled={savingDesignation}>
+              {savingDesignation ? "Saving..." : "Save"}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
