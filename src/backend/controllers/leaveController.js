@@ -210,6 +210,13 @@ export async function rejectLeave(req, res) {
   res.json(formatLeave(leave));
 }
 
+export async function deleteLeave(req, res) {
+  const leave = await LeaveRequest.findByIdAndDelete(req.params.id).lean();
+  if (!leave) return res.status(404).json({ message: "Leave request not found" });
+
+  res.json(formatLeave(leave));
+}
+
 async function getApprovedLeaveAnalysis(employeeId) {
   const [used, history] = await Promise.all([
     leavesUsedThisMonth(employeeId),

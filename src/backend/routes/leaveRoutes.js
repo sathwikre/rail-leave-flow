@@ -3,6 +3,7 @@ import { Router } from "express";
 import {
   approveLeave,
   createLeave,
+  deleteLeave,
   getLeaves,
   getLeaveById,
   getLeaveAnalysis,
@@ -18,3 +19,4 @@ leaveRoutes.post("/analysis", prospectiveAnalysis);
 leaveRoutes.post("/", createLeave);
 leaveRoutes.patch("/:id/approve", approveLeave);
 leaveRoutes.patch("/:id/reject", rejectLeave);
+leaveRoutes.delete("/:id", deleteLeave);

@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Plus } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AppLayout, StatusBadge } from "@/components/AppLayout";
@@ -66,6 +66,7 @@ function LeaveRequestsPage() {
     totalAfterApproval: number;
     exceeded?: boolean;
   }>(null);
+  const [deleteTarget, setDeleteTarget] = useState<LeaveRequest | null>(null);
 
   const calculatedDays = useMemo(() => {
     if (!form.fromDate || !form.toDate) return 0;
@@ -244,6 +245,22 @@ function LeaveRequestsPage() {
     await loadRequests();
   }
 
+  async function deleteLeave() {
+    if (!deleteTarget) return;
+
+    const response = await fetch(apiUrl(`/api/leave/${deleteTarget.id}`), { method: "DELETE" });
+    if (!response.ok) {
+      toast.error("Unable to delete leave request");
+      return;
+    }
+
+    toast.success("Leave request deleted");
+    const employeeId = deleteTarget.employeeId;
+    setDeleteTarget(null);
+    await loadRequests();
+    window.dispatchEvent(new CustomEvent("leave:deleted", { detail: { employeeId } }));
+  }
+
   return (
     <AppLayout
       title="Leave Requests"
@@ -394,8 +411,9 @@ function LeaveRequestsPage() {
                     <StatusBadge status={request.status} />
                   </td>
                   <td className="px-5 py-3">
-                    {request.status === "Pending" && (
-                      <div className="flex gap-2">
+                    <div className="flex gap-2">
+                      {request.status === "Pending" && (
+                        <>
                         <Button size="sm" onClick={() => setStatus(request.id, "approve")}>
                           Approve
                         </Button>
@@ -406,8 +424,17 @@ function LeaveRequestsPage() {
                         >
                           Reject
                         </Button>
-                      </div>
-                    )}
+                        </>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => setDeleteTarget(request)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete
+                      </Button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -440,6 +467,22 @@ function LeaveRequestsPage() {
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={approveAnyway}>{warning?.exceeded ? "Approve Anyway" : "Approve"}</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={Boolean(deleteTarget)} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Leave Request</AlertDialogTitle>
+            <AlertDialogDescription>
+              Delete this leave request for{" "}
+              <strong>{deleteTarget?.employeeName ?? deleteTarget?.employeeId}</strong>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={deleteLeave}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
