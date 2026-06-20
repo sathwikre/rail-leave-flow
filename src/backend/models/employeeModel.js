@@ -4,19 +4,34 @@ const employeeSchema = new mongoose.Schema(
   {
     employeeId: { type: String, required: true, unique: true, trim: true },
     name: { type: String, required: true, trim: true },
-    phone: { type: String, required: true, trim: true },
+    phone: { type: String, default: "", trim: true },
     designation: {
       type: String,
       required: true,
       trim: true,
-      enum: ["Station Master", "Technician", "Track Maintainer", "Signal Operator"],
+      enum: [
+        "DY SS",
+        "P/MAN",
+        "P/WOMAN",
+        "SMR",
+        "SM",
+        "SS",
+        "APM",
+        "S/MASTER",
+        "SHG-MASTER",
+        "CTNC",
+        "SR.CLERK",
+      ],
     },
-    stationId: { type: mongoose.Schema.Types.ObjectId, ref: "Station", required: true },
+    stationName: { type: String, required: true, trim: true },
+    dob: { type: Date },
+    doa: { type: Date },
+    doj: { type: Date },
   },
-  { timestamps: true },
+  { timestamps: { createdAt: true, updatedAt: false } },
 );
 
-employeeSchema.index({ stationId: 1, employeeId: 1 });
+employeeSchema.index({ stationName: 1, employeeId: 1 });
 employeeSchema.index({ name: "text", employeeId: "text", phone: "text" });
 
 employeeSchema.set("toJSON", {
@@ -24,7 +39,6 @@ employeeSchema.set("toJSON", {
   versionKey: false,
   transform: (_doc, ret) => {
     ret.id = ret.employeeId;
-    ret.stationId = String(ret.stationId);
     delete ret._id;
     return ret;
   },

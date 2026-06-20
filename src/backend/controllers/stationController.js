@@ -18,11 +18,10 @@ export async function getStationById(req, res) {
   const [summary, employees] = await Promise.all([
     stationSummary(station),
     Employee.find({
-      stationId: station._id,
+      stationName: station.stationName,
       employeeId: { $exists: true, $ne: "" },
       name: { $exists: true, $ne: "" },
       designation: { $exists: true, $ne: "" },
-      phone: { $exists: true, $ne: "" },
     }).sort({ employeeId: 1 }).lean(),
   ]);
   console.log(`Found ${employees.length} employees for station ${req.params.id}`);
@@ -34,8 +33,8 @@ export async function getStationById(req, res) {
 }
 
 async function stationSummary(station) {
-  const employeesCount = await employeeStats.getEmployeesCountForStation(station._id);
-  const onLeaveCount = await employeeStats.getEmployeesOnLeaveForStation(station._id);
+  const employeesCount = await employeeStats.getEmployeesCountForStation(station.stationName);
+  const onLeaveCount = await employeeStats.getEmployeesOnLeaveForStation(station.stationName);
 
   return {
     id: String(station._id),
@@ -53,6 +52,6 @@ function formatEmployee(employee) {
     name: employee.name,
     phone: employee.phone,
     designation: employee.designation,
-    stationId: String(employee.stationId),
+    stationName: employee.stationName,
   };
 }

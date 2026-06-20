@@ -8,7 +8,10 @@ export async function getEmployees(req, res) {
   const stationId = String(req.query.stationId ?? "").trim();
   const filter = {};
 
-  if (stationId && stationId !== "all") filter.stationId = stationId;
+  if (stationId && stationId !== "all") {
+    const station = await Station.findById(stationId).select("stationName").lean();
+    filter.stationName = station?.stationName ?? "__missing_station__";
+  }
   if (q) {
     filter.$or = [
       { employeeId: { $regex: escapeRegExp(q), $options: "i" } },
@@ -21,24 +24,23 @@ export async function getEmployees(req, res) {
   // Ensure only complete employee records are returned
   const required = {
     employeeId: { $exists: true, $ne: "" },
-    stationId: { $exists: true, $ne: null },
+    stationName: { $exists: true, $ne: "" },
     designation: { $exists: true, $ne: "" },
     name: { $exists: true, $ne: "" },
-    phone: { $exists: true, $ne: "" },
   };
 
   Object.assign(filter, required);
 
-  const employees = await Employee.find(filter).populate("stationId").sort({ employeeId: 1 }).lean();
+  const employees = await Employee.find(filter).sort({ employeeId: 1 }).lean();
   res.json(employees.map(formatEmployee));
 }
 
 export async function getEmployeeById(req, res) {
-  const employee = await Employee.findOne({ employeeId: req.params.id }).populate("stationId").lean();
+  const employee = await Employee.findOne({ employeeId: req.params.id }).lean();
   if (!employee) return res.status(404).json({ message: "Employee not found" });
 
   // Treat incomplete records as not found
-  if (!employee.employeeId || !employee.stationId || !employee.designation) {
+  if (!employee.employeeId || !employee.stationName || !employee.designation) {
     return res.status(404).json({ message: "Employee not found" });
   }
 
@@ -67,11 +69,10 @@ export async function getEmployeeById(req, res) {
 export async function getEmployeesByStation(req, res) {
   console.log("getEmployeesByStation called with stationId:", req.params.stationId);
   const employees = await Employee.find({
-    stationId: req.params.stationId,
+    stationName: (await Station.findById(req.params.stationId).select("stationName").lean())?.stationName,
     employeeId: { $exists: true, $ne: "" },
     name: { $exists: true, $ne: "" },
     designation: { $exists: true, $ne: "" },
-    phone: { $exists: true, $ne: "" },
   })
     .sort({ employeeId: 1 })
     .lean();
@@ -81,7 +82,7 @@ export async function getEmployeesByStation(req, res) {
 
 export async function getEmployeeLeaves(req, res) {
   const empId = req.params.id;
-  const employee = await Employee.findOne({ employeeId: empId }).populate("stationId").lean();
+  const employee = await Employee.findOne({ employeeId: empId }).lean();
   if (!employee) return res.status(404).json({ message: "Employee not found" });
 
   const history = await LeaveRequest.find({ employeeId: empId }).sort({ fromDate: -1 }).lean();
@@ -94,8 +95,11 @@ export async function getEmployeeLeaves(req, res) {
     employeeId: employee.employeeId,
     employeeName: employee.name,
     designation: employee.designation,
-    stationName: employee.stationId?.stationName ?? null,
+    stationName: employee.stationName,
     phone: employee.phone,
+    dob: employee.dob ? (new Date(employee.dob)).toISOString().slice(0,10) : null,
+    doa: employee.doa ? (new Date(employee.doa)).toISOString().slice(0,10) : null,
+    doj: employee.doj ? (new Date(employee.doj)).toISOString().slice(0,10) : null,
     latestLeaveDate: lastLeaveDate(history),
     leavesUsedThisMonth: leavesUsed,
     currentStatus: onLeaveNow ? "On Leave" : "Present",
@@ -109,36 +113,41 @@ export async function createEmployee(req, res) {
     name: req.body.name,
     phone: req.body.phone,
     designation: req.body.designation,
-    stationId: req.body.stationId,
+    stationName: "",
+    dob: req.body.dob ? new Date(req.body.dob) : undefined,
+    doa: req.body.doa ? new Date(req.body.doa) : undefined,
+    doj: req.body.doj ? new Date(req.body.doj) : undefined,
   };
 
-  const station = await Station.findById(payload.stationId).lean();
+  const station = await Station.findById(req.body.stationId).lean();
   if (!station) return res.status(400).json({ message: "Station not found" });
+  payload.stationName = station.stationName;
+  if (payload.designation === "P.WOMAN") payload.designation = "P/WOMAN";
 
   const employee = await Employee.create(payload);
-  await syncStationTotal(payload.stationId);
-  res.status(201).json(formatEmployee(await Employee.findById(employee._id).populate("stationId").lean()));
+  await syncStationTotal(req.body.stationId);
+  res.status(201).json(formatEmployee(await Employee.findById(employee._id).lean()));
 }
 
 export async function syncStationTotal(stationId) {
   // Use employeeStats service to count only valid employees for the station
   const { getEmployeesCountForStation } = await import("../services/employeeStatsService.js");
-  const totalEmployees = await getEmployeesCountForStation(stationId);
+  const station = await Station.findById(stationId).select("stationName").lean();
+  const totalEmployees = station ? await getEmployeesCountForStation(station.stationName) : 0;
   await Station.findByIdAndUpdate(stationId, { totalEmployees });
 }
 
 function formatEmployee(employee) {
-  const station = employee.stationId && typeof employee.stationId === "object" ? employee.stationId : null;
-  const stationId = station ? String(station._id) : String(employee.stationId);
-
   return {
     id: employee.employeeId,
     employeeId: employee.employeeId,
     name: employee.name,
     phone: employee.phone,
     designation: employee.designation,
-    stationId,
-    stationName: station?.stationName,
+    stationName: employee.stationName,
+    dob: employee.dob ? (new Date(employee.dob)).toISOString().slice(0,10) : null,
+    doa: employee.doa ? (new Date(employee.doa)).toISOString().slice(0,10) : null,
+    doj: employee.doj ? (new Date(employee.doj)).toISOString().slice(0,10) : null,
   };
 }
 

@@ -126,11 +126,17 @@ function Dashboard() {
     window.addEventListener("focus", onRefresh);
     window.addEventListener("focus", loadOnLeaveDetails);
     refreshEvents.forEach((ev) => window.addEventListener(ev, onRefresh as EventListener));
+    // listen for server import refresh event
+    function onAppRefresh() {
+      onRefresh();
+    }
+    window.addEventListener("app:refresh", onAppRefresh as EventListener);
     return () => {
       ignore = true;
       window.removeEventListener("focus", onRefresh);
       window.removeEventListener("focus", loadOnLeaveDetails);
       refreshEvents.forEach((ev) => window.removeEventListener(ev, onRefresh as EventListener));
+      window.removeEventListener("app:refresh", onAppRefresh as EventListener);
     };
   }, []);
 

@@ -1,15 +1,13 @@
 import { Employee } from "../models/employeeModel.js";
 import { LeaveRequest } from "../models/leaveRequestModel.js";
 import { todayDateString } from "../controllers/leaveMetrics.js";
-import { Station } from "../models/stationModel.js";
 
 function validEmployeeFilter() {
   return {
     employeeId: { $exists: true, $ne: "" },
     name: { $exists: true, $ne: "" },
     designation: { $exists: true, $ne: "" },
-    stationId: { $exists: true, $ne: null },
-    phone: { $exists: true, $ne: "" },
+    stationName: { $exists: true, $ne: "" },
   };
 }
 
@@ -18,13 +16,13 @@ export async function getTotalEmployees() {
   return Employee.countDocuments(filter);
 }
 
-export async function getEmployeesCountForStation(stationId) {
-  const filter = { ...validEmployeeFilter(), stationId };
+export async function getEmployeesCountForStation(stationName) {
+  const filter = { ...validEmployeeFilter(), stationName };
   return Employee.countDocuments(filter);
 }
 
-export async function getEmployeesOnLeaveForStation(stationId) {
-  const filter = { ...validEmployeeFilter(), stationId };
+export async function getEmployeesOnLeaveForStation(stationName) {
+  const filter = { ...validEmployeeFilter(), stationName };
   const employees = await Employee.find(filter).select("employeeId").lean();
   const ids = employees.map((e) => e.employeeId);
   if (!ids.length) return 0;
@@ -55,7 +53,7 @@ export async function getEmployeesOnLeaveToday() {
 
 export async function getEmployeesOnLeaveTodayDetails() {
   const filter = validEmployeeFilter();
-  const employees = await Employee.find(filter).select("employeeId name designation stationId").lean();
+  const employees = await Employee.find(filter).select("employeeId name designation stationName").lean();
   const empMap = new Map(employees.map((e) => [e.employeeId, e]));
   const ids = employees.map((e) => e.employeeId);
   if (!ids.length) return [];
@@ -72,18 +70,12 @@ export async function getEmployeesOnLeaveTodayDetails() {
 
   if (!leaves.length) return [];
 
-  // Fetch station names for employees referenced
-  const stationIds = Array.from(new Set(employees.map((e) => String(e.stationId))));
-  const stations = await Station.find({ _id: { $in: stationIds } }).select("stationName").lean();
-  const stationMap = new Map(stations.map((s) => [String(s._id), s.stationName]));
-
   const result = leaves.map((leave) => {
     const emp = empMap.get(leave.employeeId) || {};
-    const stationName = emp.stationId ? stationMap.get(String(emp.stationId)) || "" : "";
     return {
       employeeId: leave.employeeId,
       employeeName: emp.name || "",
-      stationName,
+      stationName: emp.stationName || "",
       designation: emp.designation || "",
       fromDate: leave.fromDate,
       toDate: leave.toDate,
@@ -112,7 +104,7 @@ export async function getEmployeesOnLeave(date) {
 
 export async function getEmployeesOnLeaveDetails(date) {
   const filter = validEmployeeFilter();
-  const employees = await Employee.find(filter).select("employeeId name designation stationId").lean();
+  const employees = await Employee.find(filter).select("employeeId name designation stationName").lean();
   const empMap = new Map(employees.map((e) => [e.employeeId, e]));
   const ids = employees.map((e) => e.employeeId);
   if (!ids.length) return [];
@@ -129,17 +121,12 @@ export async function getEmployeesOnLeaveDetails(date) {
 
   if (!leaves.length) return [];
 
-  const stationIds = Array.from(new Set(employees.map((e) => String(e.stationId))));
-  const stations = await Station.find({ _id: { $in: stationIds } }).select("stationName").lean();
-  const stationMap = new Map(stations.map((s) => [String(s._id), s.stationName]));
-
   const result = leaves.map((leave) => {
     const emp = empMap.get(leave.employeeId) || {};
-    const stationName = emp.stationId ? stationMap.get(String(emp.stationId)) || "" : "";
     return {
       employeeId: leave.employeeId,
       employeeName: emp.name || "",
-      stationName,
+      stationName: emp.stationName || "",
       designation: emp.designation || "",
       fromDate: leave.fromDate,
       toDate: leave.toDate,
@@ -176,20 +163,15 @@ export async function getSickLeavesList(date) {
   if (!leaves.length) return [];
 
   const employeeIds = Array.from(new Set(leaves.map((l) => l.employeeId)));
-  const employees = await Employee.find({ employeeId: { $in: employeeIds } }).select("employeeId name designation stationId").lean();
+  const employees = await Employee.find({ employeeId: { $in: employeeIds } }).select("employeeId name designation stationName").lean();
   const empMap = new Map(employees.map((e) => [e.employeeId, e]));
-
-  const stationIds = Array.from(new Set(employees.map((e) => String(e.stationId))));
-  const stations = await Station.find({ _id: { $in: stationIds } }).select("stationName").lean();
-  const stationMap = new Map(stations.map((s) => [String(s._id), s.stationName]));
 
   return leaves.map((leave) => {
     const emp = empMap.get(leave.employeeId) || {};
-    const stationName = emp.stationId ? stationMap.get(String(emp.stationId)) || "" : "";
     return {
       employeeId: leave.employeeId,
       employeeName: emp.name || "",
-      stationName,
+      stationName: emp.stationName || "",
       designation: emp.designation || "",
       fromDate: leave.fromDate,
       toDate: leave.toDate,

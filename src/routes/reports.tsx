@@ -43,7 +43,11 @@ function ReportsPage() {
       loadReports();
     }
     window.addEventListener("leave:approved", onApproved as EventListener);
-    return () => window.removeEventListener("leave:approved", onApproved as EventListener);
+    window.addEventListener("app:refresh", onApproved as EventListener);
+    return () => {
+      window.removeEventListener("leave:approved", onApproved as EventListener);
+      window.removeEventListener("app:refresh", onApproved as EventListener);
+    };
   }, []);
 
   return (

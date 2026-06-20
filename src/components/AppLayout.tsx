@@ -160,6 +160,23 @@ export function AppLayout({
   );
 }
 
+// Setup a global EventSource to listen for server-sent events and re-broadcast as window events
+if (typeof window !== "undefined") {
+  try {
+    const es = new EventSource("/api/events");
+    es.addEventListener("app:refresh", (e: MessageEvent) => {
+      try {
+        const data = e.data ? JSON.parse(e.data) : null;
+        window.dispatchEvent(new CustomEvent("app:refresh", { detail: data }));
+      } catch (err) {
+        window.dispatchEvent(new CustomEvent("app:refresh"));
+      }
+    });
+  } catch (e) {
+    // ignore if EventSource not supported
+  }
+}
+
 export function StatusBadge({
   status,
 }: {

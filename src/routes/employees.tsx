@@ -33,11 +33,23 @@ type Employee = {
   name: string;
   phone: string;
   designation: string;
-  stationId: string;
+  stationId?: string;
   stationName?: string;
 };
 
-const designations = ["Station Master", "Technician", "Track Maintainer", "Signal Operator"];
+const designations = [
+  "DY SS",
+  "P/MAN",
+  "P/WOMAN",
+  "SMR",
+  "SM",
+  "SS",
+  "APM",
+  "S/MASTER",
+  "SHG MASTER",
+  "CTNC",
+  "SR.CLERK",
+];
 
 function EmployeesPage() {
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
@@ -71,22 +83,34 @@ function EmployeesPage() {
     phone: "",
     designation: designations[0],
     stationId: "",
+    dob: "",
+    doa: "",
+    doj: "",
   });
 
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
     return employees.filter(
       (employee) =>
-        (stationId === "all" || employee.stationId === stationId) &&
+        (stationId === "all" || employee.stationName === stations.find((station) => station.id === stationId)?.stationName) &&
         (!query ||
           employee.name.toLowerCase().includes(query) ||
           employee.employeeId.toLowerCase().includes(query) ||
-          employee.phone.toLowerCase().includes(query)),
+          (employee.phone ?? "").toLowerCase().includes(query)),
     );
-  }, [employees, q, stationId]);
+  }, [employees, q, stationId, stations]);
 
   useEffect(() => {
+    let ignore = false;
     load();
+    const onAppRefresh = () => {
+      if (!ignore) load();
+    };
+    window.addEventListener("app:refresh", onAppRefresh as EventListener);
+    return () => {
+      ignore = true;
+      window.removeEventListener("app:refresh", onAppRefresh as EventListener);
+    };
   }, []);
 
   async function load() {
@@ -97,7 +121,7 @@ function EmployeesPage() {
     const stationData = stationRes.ok ? await stationRes.json() : [];
     const employeeData = employeeRes.ok ? await employeeRes.json() : [];
     // Filter out incomplete employee records on the client as a safety net
-    const isComplete = (e: any) => e && e.employeeId && e.stationId && e.designation;
+    const isComplete = (e: any) => e && e.employeeId && e.stationName && e.designation;
     const completeEmployees = Array.isArray(employeeData) ? employeeData.filter(isComplete) : [];
     setStations(stationData);
     setEmployees(completeEmployees);
@@ -129,6 +153,9 @@ function EmployeesPage() {
       phone: "",
       designation: designations[0],
       stationId: stations[0]?.id || "",
+      dob: "",
+      doa: "",
+      doj: "",
     });
     await load();
   }
@@ -187,6 +214,9 @@ function EmployeesPage() {
                   <div>Designation: <strong>{employeeLeaves.designation}</strong></div>
                   <div>Station: <strong>{employeeLeaves.stationName ?? "-"}</strong></div>
                   <div>Phone: <strong>{employeeLeaves.phone ?? "-"}</strong></div>
+                  <div>DOB: <strong>{employeeLeaves.dob ?? "-"}</strong></div>
+                  <div>DOA: <strong>{employeeLeaves.doa ?? "-"}</strong></div>
+                  <div>DOJ: <strong>{employeeLeaves.doj ?? "-"}</strong></div>
                   <div>Latest Leave Date: <strong>{employeeLeaves.latestLeaveDate ?? "-"}</strong></div>
                   <div>Leaves Used This Month: <strong>{employeeLeaves.leavesUsedThisMonth ?? 0}</strong></div>
                   <div>Current Status: <strong>{employeeLeaves.currentStatus ?? "Present"}</strong></div>
@@ -252,6 +282,12 @@ function EmployeesPage() {
               value={form.phone}
               onChange={(event) => setForm({ ...form, phone: event.target.value })}
             />
+            <Input
+              type="date"
+              placeholder="DOB"
+              value={form.dob}
+              onChange={(event) => setForm({ ...form, dob: event.target.value })}
+            />
             <Select
               value={form.designation}
               onValueChange={(value) => setForm({ ...form, designation: value })}
@@ -282,6 +318,18 @@ function EmployeesPage() {
                 ))}
               </SelectContent>
             </Select>
+            <Input
+              type="date"
+              placeholder="DOA"
+              value={form.doa}
+              onChange={(event) => setForm({ ...form, doa: event.target.value })}
+            />
+            <Input
+              type="date"
+              placeholder="DOJ"
+              value={form.doj}
+              onChange={(event) => setForm({ ...form, doj: event.target.value })}
+            />
           </div>
           <Button className="mt-3" onClick={createEmployee}>
             Create Employee

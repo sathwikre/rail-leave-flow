@@ -61,8 +61,11 @@ function StationsPage() {
     }
 
     loadStations();
+    const onAppRefresh = () => loadStations();
+    window.addEventListener("app:refresh", onAppRefresh as EventListener);
     return () => {
       ignore = true;
+      window.removeEventListener("app:refresh", onAppRefresh as EventListener);
     };
   }, []);
 

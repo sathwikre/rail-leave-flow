@@ -14,6 +14,7 @@ import { stationRoutes } from "./routes/stationRoutes.js";
 import { seedIfEmpty } from "./seed-data.js";
 import { todayDateString } from "./controllers/leaveMetrics.js";
 import * as employeeStats from "./services/employeeStatsService.js";
+import { employeeDocument, railwayEmployees } from "./data/mantapampalleEmployees.js";
 
 export async function createApp() {
   await connectDatabase();
@@ -25,6 +26,78 @@ export async function createApp() {
 
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true });
+  });
+
+  // Server-Sent Events clients
+  const sseClients = new Set();
+
+  app.get("/api/events", (req, res) => {
+    res.set({
+      Connection: "keep-alive",
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-store",
+    });
+    res.flushHeaders?.();
+    res.write(`retry: 10000\n\n`);
+    const client = res;
+    sseClients.add(client);
+
+    req.on("close", () => {
+      sseClients.delete(client);
+    });
+  });
+
+  function broadcastEvent(name, data) {
+    const payload = typeof data === "string" ? data : JSON.stringify(data);
+    for (const client of sseClients) {
+      try {
+        client.write(`event: ${name}\ndata: ${payload}\n\n`);
+      } catch (e) {
+        // ignore
+      }
+    }
+  }
+
+  // Admin import endpoint to replace employee data (preserves LeaveRequest collection)
+  app.post("/api/admin/import-employees", async (req, res) => {
+    try {
+      const list = Array.isArray(req.body) && req.body.length ? req.body : railwayEmployees;
+      const records = [...new Map(list.map((record) => {
+        const employee = employeeDocument(record);
+        return [employee.employeeId, employee];
+      })).values()];
+
+      await Employee.deleteMany({});
+      for (const employee of records) {
+        await Station.updateOne(
+          { stationName: employee.stationName },
+          { $setOnInsert: { stationName: employee.stationName, stationMaster: "", totalEmployees: 0 } },
+          { upsert: true },
+        );
+        await Employee.updateOne(
+          { employeeId: employee.employeeId },
+          { $set: employee, $setOnInsert: { createdAt: new Date() } },
+          { upsert: true },
+        );
+      }
+
+      // recompute station totals
+      const stationsAll = await Station.find().lean();
+      await Promise.all(
+        stationsAll.map(async (st) => {
+          const count = await employeeStats.getEmployeesCountForStation(st.stationName);
+          return Station.findByIdAndUpdate(st._id, { totalEmployees: count });
+        }),
+      );
+
+      // notify clients to refresh pages
+      broadcastEvent("app:refresh", { pages: ["dashboard", "stations", "employees", "reports"] });
+
+      res.json({ ok: true, imported: records.length });
+    } catch (err) {
+      console.error("Import failed", err);
+      res.status(500).json({ error: String(err) });
+    }
   });
 
   app.get("/api/dashboard", dashboard);

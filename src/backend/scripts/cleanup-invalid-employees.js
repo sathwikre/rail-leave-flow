@@ -10,8 +10,8 @@ async function main() {
       $or: [
         { employeeId: { $exists: false } },
         { employeeId: "" },
-        { stationId: { $exists: false } },
-        { stationId: null },
+        { stationName: { $exists: false } },
+        { stationName: "" },
         { designation: { $exists: false } },
         { designation: "" },
       ],

@@ -26,6 +26,9 @@ type EmployeeProfileData = {
   phone: string;
   designation: string;
   stationName: string;
+  dob?: string | null;
+  doa?: string | null;
+  doj?: string | null;
   leavesUsedThisMonth?: number;
   remainingLeaves?: number;
   lastLeaveDate?: string | null;
@@ -120,6 +123,9 @@ function EmployeeProfile() {
             <Row icon={Phone} label="Phone Number" value={employee.phone} />
             <Row icon={User} label="Designation" value={employee.designation} />
             <Row icon={Building2} label="Station" value={employee.stationName} />
+            <Row icon={User} label="DOB" value={employee.dob ?? "-"} />
+            <Row icon={User} label="DOA" value={employee.doa ?? "-"} />
+            <Row icon={User} label="DOJ" value={employee.doj ?? "-"} />
           </div>
         </div>
 

@@ -15,10 +15,9 @@ export async function getStationReport(_req, res) {
     Station.find().sort({ stationName: 1 }).lean(),
     Employee.find({
       employeeId: { $exists: true, $ne: "" },
-      stationId: { $exists: true, $ne: null },
+      stationName: { $exists: true, $ne: "" },
       designation: { $exists: true, $ne: "" },
       name: { $exists: true, $ne: "" },
-      phone: { $exists: true, $ne: "" },
     }).lean(),
   ]);
   const today = todayDateString();
@@ -26,7 +25,7 @@ export async function getStationReport(_req, res) {
   const rows = await Promise.all(
     stations.map(async (station) => {
       const stationEmployees = employees.filter(
-        (employee) => String(employee.stationId) === String(station._id),
+        (employee) => employee.stationName === station.stationName,
       );
       const employeeIds = stationEmployees.map((employee) => employee.employeeId);
       const onLeaveIds = employeeIds.length
@@ -58,10 +57,9 @@ export async function getStationReport(_req, res) {
 export async function getEmployeeReport(_req, res) {
   const employees = await Employee.find({
     employeeId: { $exists: true, $ne: "" },
-    stationId: { $exists: true, $ne: null },
+    stationName: { $exists: true, $ne: "" },
     designation: { $exists: true, $ne: "" },
     name: { $exists: true, $ne: "" },
-    phone: { $exists: true, $ne: "" },
   }).sort({ employeeId: 1 }).lean();
   const rows = await Promise.all(
     employees.map(async (employee) => {
@@ -89,11 +87,10 @@ export async function getStationById(req, res) {
   if (!station) return res.status(404).json({ error: "Station not found" });
 
   const employees = await Employee.find({
-    stationId: station._id,
+    stationName: station.stationName,
     employeeId: { $exists: true, $ne: "" },
     designation: { $exists: true, $ne: "" },
     name: { $exists: true, $ne: "" },
-    phone: { $exists: true, $ne: "" },
   })
     .sort({ employeeId: 1 })
     .lean();
