@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { apiUrl } from "@/lib/api";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
@@ -163,7 +164,7 @@ export function AppLayout({
 // Setup a global EventSource to listen for server-sent events and re-broadcast as window events
 if (typeof window !== "undefined") {
   try {
-    const es = new EventSource("/api/events");
+    const es = new EventSource(apiUrl("/api/events"));
     es.addEventListener("app:refresh", (e: MessageEvent) => {
       try {
         const data = e.data ? JSON.parse(e.data) : null;

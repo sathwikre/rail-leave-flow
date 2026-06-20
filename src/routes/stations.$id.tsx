@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, UserCheck, UserRound, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
+import { apiUrl } from "@/lib/api";
 import { StatCard } from "@/components/StatCard";
 
 export const Route = createFileRoute("/stations/$id")({
@@ -161,9 +162,4 @@ function StationDetailPage() {
       </div>
     </AppLayout>
   );
-}
-
-function apiUrl(path: string) {
-  const apiBase = import.meta.env?.VITE_API_BASE ?? "";
-  return apiBase ? `${apiBase.replace(/\/$/, "")}${path}` : path;
 }

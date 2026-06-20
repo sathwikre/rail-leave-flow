@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
+import { apiUrl } from "@/lib/api";
 
 export const Route = createFileRoute("/reports")({
   head: () => ({ meta: [{ title: "Reports - Railway LMS" }] }),
@@ -114,9 +115,4 @@ function ReportTable({ title, children }: { title: string; children: ReactNode }
       </div>
     </div>
   );
-}
-
-function apiUrl(path: string) {
-  const apiBase = import.meta.env?.VITE_API_BASE ?? "";
-  return apiBase ? `${apiBase.replace(/\/$/, "")}${path}` : path;
 }

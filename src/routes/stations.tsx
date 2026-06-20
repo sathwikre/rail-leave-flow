@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Building2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppLayout } from "@/components/AppLayout";
+import { apiUrl } from "@/lib/api";
 // StatCard removed per UX change: top summary cards deleted
 import { Button } from "@/components/ui/button";
 import {
@@ -182,9 +183,4 @@ function StationsPage() {
       </Dialog>
     </AppLayout>
   );
-}
-
-function apiUrl(path: string) {
-  const apiBase = import.meta.env?.VITE_API_BASE ?? "";
-  return apiBase ? `${apiBase.replace(/\/$/, "")}${path}` : path;
 }

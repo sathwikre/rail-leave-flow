@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useState } from "react";
 import { AppLayout, StatusBadge } from "@/components/AppLayout";
+import { apiUrl } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -208,9 +209,4 @@ function LeaveRequestDetail() {
           </AlertDialog>
     </AppLayout>
   );
-}
-
-function apiUrl(path: string) {
-  const apiBase = import.meta.env?.VITE_API_BASE ?? "";
-  return apiBase ? `${apiBase.replace(/\/$/, "")}${path}` : path;
 }

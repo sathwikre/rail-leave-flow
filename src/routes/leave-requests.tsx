@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AppLayout, StatusBadge } from "@/components/AppLayout";
+import { apiUrl } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -440,9 +441,4 @@ function LeaveRequestsPage() {
       </AlertDialog>
     </AppLayout>
   );
-}
-
-function apiUrl(path: string) {
-  const apiBase = import.meta.env?.VITE_API_BASE ?? "";
-  return apiBase ? `${apiBase.replace(/\/$/, "")}${path}` : path;
 }

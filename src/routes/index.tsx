@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
 import { useEffect, useState } from "react";
 import { AppLayout, StatusBadge } from "@/components/AppLayout";
+import { apiUrl } from "@/lib/api";
 import { StatCard } from "@/components/StatCard";
 import { Button } from "@/components/ui/button";
 
@@ -305,11 +306,6 @@ function Dashboard() {
       </AlertDialog>
     </AppLayout>
   );
-}
-
-function apiUrl(path: string) {
-  const apiBase = import.meta.env?.VITE_API_BASE ?? "";
-  return apiBase ? `${apiBase.replace(/\/$/, "")}${path}` : path;
 }
 
 function formatShortDate(dateStr: string) {

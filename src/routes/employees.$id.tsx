@@ -3,6 +3,7 @@ import { ArrowLeft, Building2, Phone, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { AppLayout, StatusBadge } from "@/components/AppLayout";
+import { apiUrl } from "@/lib/api";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -337,9 +338,4 @@ function Stat({ label, value, tone, small, }: { label: string; value: number | s
 
 function initials(name: string) {
   return name ? name.split(" ").map((part) => part[0]).slice(0, 2).join("") : "";
-}
-
-function apiUrl(path: string) {
-  const apiBase = import.meta.env?.VITE_API_BASE ?? "";
-  return apiBase ? `${apiBase.replace(/\/$/, "")}${path}` : path;
 }

@@ -1,9 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
-  Outlet, Link, createRootRouteWithContext, useRouter, HeadContent, Scripts,
+  Outlet, Link, createRootRouteWithContext, useRouter,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
-import appCss from "../styles.css?url";
+import { useEffect } from "react";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -39,42 +38,10 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Railway Station Leave Management System" },
-      { name: "description", content: "Manage station employees and leave requests for railway operations." },
-      { property: "og:title", content: "Railway Station Leave Management System" },
-      { name: "twitter:title", content: "Railway Station Leave Management System" },
-      { property: "og:description", content: "Manage station employees and leave requests for railway operations." },
-      { name: "twitter:description", content: "Manage station employees and leave requests for railway operations." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/76e8978e-ee03-41fa-8172-07d0185755a7/id-preview-80b222ac--3e0d5dfe-e2ab-433d-81bd-78d8af7200ea.lovable.app-1781507362882.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/76e8978e-ee03-41fa-8172-07d0185755a7/id-preview-80b222ac--3e0d5dfe-e2ab-433d-81bd-78d8af7200ea.lovable.app-1781507362882.png" },
-      { name: "twitter:card", content: "summary_large_image" },
-      { property: "og:type", content: "website" },
-    ],
-    links: [
-      { rel: "stylesheet", href: appCss },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      { rel: "stylesheet", href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" },
-    ],
-  }),
-  shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
 });
-
-function RootShell({ children }: { children: ReactNode }) {
-  return (
-    <html lang="en">
-      <head><HeadContent /></head>
-      <body>{children}<Scripts /></body>
-    </html>
-  );
-}
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
