@@ -9,6 +9,7 @@
     "server": "node src/backend/server.js",
     "start": "node src/backend/server.js",
     "build": "vite build",
+    "postbuild": "node scripts/ensure-dist-index.mjs",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
     "lint": "eslint .",
