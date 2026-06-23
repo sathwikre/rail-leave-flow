@@ -1,4 +1,5 @@
 import { railwayEmployees, employeeDocument } from "./data/mantapampalleEmployees.js";
+import { isEmployeeCountExcludedStation } from "./data/stationRules.js";
 import { Employee } from "./models/employeeModel.js";
 import { Station } from "./models/stationModel.js";
 
@@ -80,6 +81,15 @@ export async function seedIfEmpty() {
   const counts = new Map(totals.map((item) => [item._id, item.count]));
   const stations = await Station.find().select("stationName").lean();
   await Promise.all(stations.map((station) =>
-    Station.updateOne({ _id: station._id }, { $set: { totalEmployees: counts.get(station.stationName) ?? 0 } }),
+    Station.updateOne(
+      { _id: station._id },
+      {
+        $set: {
+          totalEmployees: isEmployeeCountExcludedStation(station.stationName)
+            ? 0
+            : counts.get(station.stationName) ?? 0,
+        },
+      },
+    ),
   ));
 }

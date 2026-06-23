@@ -36,6 +36,7 @@ type Employee = {
 };
 
 const hiddenStationNames = new Set(["NANDALUR"]);
+const stationCountExcludedNames = new Set(["TI/HX"]);
 
 function StationsPage() {
   const navigate = useNavigate();
@@ -77,6 +78,9 @@ function StationsPage() {
 
   const totalEmployees = stations.reduce((sum, station) => sum + station.totalEmployees, 0);
   const onLeave = stations.reduce((sum, station) => sum + station.employeesOnLeave, 0);
+  const countedStations = stations.filter(
+    (station) => !stationCountExcludedNames.has(station.stationName.toUpperCase()),
+  );
 
   async function handleViewEmployees(stationId: string) {
     console.log("Selected station:", stationId);
@@ -106,7 +110,7 @@ function StationsPage() {
   return (
     <AppLayout
       title="Stations"
-      subtitle={`${stations.length} stations managed from one leave desk`}
+      subtitle={`${countedStations.length} stations managed from one leave desk`}
     >
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         {stations.map((station) => (
