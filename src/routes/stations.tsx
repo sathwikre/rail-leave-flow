@@ -104,7 +104,10 @@ function StationsPage() {
   }
 
   return (
-    <AppLayout title="Stations" subtitle="10 stations managed from one leave desk">
+    <AppLayout
+      title="Stations"
+      subtitle={`${stations.length} stations managed from one leave desk`}
+    >
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
         {stations.map((station) => (
           <div

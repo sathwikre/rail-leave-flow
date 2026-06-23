@@ -174,7 +174,7 @@ function Dashboard() {
   return (
     <AppLayout
       title="Dashboard"
-      subtitle="Leave tracking across 10 railway stations"
+      subtitle={`Leave tracking across ${stats.totalStations} railway stations`}
       actions={
         <Button asChild size="sm">
           <Link to="/leave-requests">New Leave Request</Link>
