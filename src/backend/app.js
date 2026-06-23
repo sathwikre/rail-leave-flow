@@ -62,10 +62,12 @@ export async function createApp() {
   app.post("/api/admin/import-employees", async (req, res) => {
     try {
       const list = Array.isArray(req.body) && req.body.length ? req.body : railwayEmployees;
-      const records = [...new Map(list.map((record) => {
+      const employeeById = new Map();
+      for (const record of list) {
         const employee = employeeDocument(record);
-        return [employee.employeeId, employee];
-      })).values()];
+        if (!employeeById.has(employee.employeeId)) employeeById.set(employee.employeeId, employee);
+      }
+      const records = [...employeeById.values()];
 
       await Employee.deleteMany({});
       for (const employee of records) {

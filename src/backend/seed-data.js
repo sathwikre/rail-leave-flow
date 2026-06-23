@@ -5,7 +5,7 @@ import { Station } from "./models/stationModel.js";
 const stationNames = [
   "MANTAPAMPALLE", "ONTIMITTA", "BHAKARAPETA", "KANAMALOPALLE", "KADAPA",
   "KRISHNAPURAM", "GANGAYAPALLE", "KAMALAPURAM", "YERRAGUDIPADU",
-  "YERRAGUNTLA", "NANDALUR", "KALAMALLA", "MUDDANUR",
+  "YERRAGUNTLA", "KALAMALLA", "MUDDANUR",
 ];
 
 export async function seedIfEmpty() {
@@ -17,9 +17,14 @@ export async function seedIfEmpty() {
     );
   }
 
-  // Keep the supplied real roster available after a fresh deployment; never seed dummy employees.
+  const employeeById = new Map();
   for (const record of railwayEmployees) {
     const employee = employeeDocument(record);
+    if (!employeeById.has(employee.employeeId)) employeeById.set(employee.employeeId, employee);
+  }
+
+  // Keep the supplied real roster available after a fresh deployment; never seed dummy employees.
+  for (const employee of employeeById.values()) {
     await Employee.updateOne(
       { employeeId: employee.employeeId },
       { $set: employee, $setOnInsert: { createdAt: new Date() } },

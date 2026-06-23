@@ -9,10 +9,12 @@ dotenv.config();
 
 if (!process.env.MONGODB_URI) throw new Error("MONGODB_URI is not set");
 
-const records = [...new Map(railwayEmployees.map((record) => {
+const employeeById = new Map();
+for (const record of railwayEmployees) {
   const employee = employeeDocument(record);
-  return [employee.employeeId, employee];
-})).values()];
+  if (!employeeById.has(employee.employeeId)) employeeById.set(employee.employeeId, employee);
+}
+const records = [...employeeById.values()];
 
 try {
   await mongoose.connect(process.env.MONGODB_URI);

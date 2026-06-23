@@ -35,6 +35,8 @@ type Employee = {
   stationId?: string;
 };
 
+const hiddenStationNames = new Set(["NANDALUR"]);
+
 function StationsPage() {
   const navigate = useNavigate();
   const [stations, setStations] = useState<Station[]>([]);
@@ -50,10 +52,13 @@ function StationsPage() {
       try {
         const response = await fetch(apiUrl("/api/stations"), { cache: "no-store" });
         if (!response.ok) return;
-        const data = await response.json();
+        const data: Station[] = await response.json();
         if (!ignore) {
-          setStations(data);
-          const total = data.reduce((s: any, it: any) => s + (it.totalEmployees || 0), 0);
+          const visibleStations = data.filter(
+            (station) => !hiddenStationNames.has(station.stationName.toUpperCase()),
+          );
+          setStations(visibleStations);
+          const total = visibleStations.reduce((sum, station) => sum + station.totalEmployees, 0);
           console.log("Stations total employees:", total);
         }
       } catch (error) {

@@ -53,8 +53,9 @@ for (const record of records) {
     conflicts.push({
       employeeId: record.employeeId,
       previous: `${previous.name} (${previous.stationName})`,
-      applied: `${record.name} (${record.stationName})`,
+      skipped: `${record.name} (${record.stationName})`,
     });
+    continue;
   }
   byEmployeeId.set(record.employeeId, record);
 }
