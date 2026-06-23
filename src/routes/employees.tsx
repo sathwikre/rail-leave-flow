@@ -37,6 +37,9 @@ type Employee = {
   designation: string;
   stationId?: string;
   stationName?: string;
+  dob?: string | null;
+  doa?: string | null;
+  doj?: string | null;
 };
 
 const designations = [
@@ -58,10 +61,18 @@ function EmployeesPage() {
   const [employeeLeaves, setEmployeeLeaves] = useState<any | null>(null);
   const [employeeModalOpen, setEmployeeModalOpen] = useState(false);
   const [employeeLeavesLoading, setEmployeeLeavesLoading] = useState(false);
-  const [editDesignationOpen, setEditDesignationOpen] = useState(false);
-  const [designationChoice, setDesignationChoice] = useState("");
-  const [customDesignation, setCustomDesignation] = useState("");
-  const [savingDesignation, setSavingDesignation] = useState(false);
+  const [editDetailsOpen, setEditDetailsOpen] = useState(false);
+  const [savingDetails, setSavingDetails] = useState(false);
+  const [editForm, setEditForm] = useState({
+    employeeId: "",
+    name: "",
+    phone: "",
+    designation: "",
+    stationId: "",
+    dob: "",
+    doa: "",
+    doj: "",
+  });
 
   async function openEmployeeModal(employee: Employee) {
     setSelectedEmployee(employee);
@@ -79,46 +90,63 @@ function EmployeesPage() {
     }
   }
 
-  function openDesignationEditor() {
-    const currentDesignation = employeeLeaves?.designation ?? selectedEmployee?.designation ?? "";
-    const known = designations.includes(currentDesignation);
-    setDesignationChoice(known ? currentDesignation : "Other");
-    setCustomDesignation(known ? "" : currentDesignation);
-    setEditDesignationOpen(true);
+  function openDetailsEditor() {
+    const stationName = employeeLeaves?.stationName ?? selectedEmployee?.stationName ?? "";
+    const currentStation = stations.find((station) => station.stationName === stationName);
+    setEditForm({
+      employeeId: employeeLeaves?.employeeId ?? selectedEmployee?.employeeId ?? "",
+      name: employeeLeaves?.employeeName ?? selectedEmployee?.name ?? "",
+      phone: employeeLeaves?.phone ?? selectedEmployee?.phone ?? "",
+      designation: employeeLeaves?.designation ?? selectedEmployee?.designation ?? "",
+      stationId: currentStation?.id ?? stations[0]?.id ?? "",
+      dob: employeeLeaves?.dob ?? selectedEmployee?.dob ?? "",
+      doa: employeeLeaves?.doa ?? selectedEmployee?.doa ?? "",
+      doj: employeeLeaves?.doj ?? selectedEmployee?.doj ?? "",
+    });
+    setEditDetailsOpen(true);
   }
 
-  async function saveDesignation() {
+  async function saveDetails() {
     const employeeId = employeeLeaves?.employeeId ?? selectedEmployee?.employeeId;
-    const nextDesignation = designationChoice === "Other" ? customDesignation.trim() : designationChoice;
-    if (!employeeId || !nextDesignation) {
-      toast.error("Please select or enter a designation");
+    if (!employeeId || !editForm.employeeId.trim() || !editForm.name.trim() || !editForm.designation.trim() || !editForm.stationId) {
+      toast.error("Employee ID, name, designation and station are required");
       return;
     }
 
-    setSavingDesignation(true);
+    setSavingDetails(true);
     try {
-      const response = await fetch(apiUrl(`/api/employees/${employeeId}/designation`), {
+      const response = await fetch(apiUrl(`/api/employees/${employeeId}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ designation: nextDesignation }),
+        body: JSON.stringify(editForm),
       });
 
       if (!response.ok) {
-        toast.error(`Failed to update designation: ${await response.text()}`);
+        toast.error(`Failed to update employee: ${await response.text()}`);
         return;
       }
 
       const updated = await response.json();
-      setEmployeeLeaves((current: any) => current ? { ...current, designation: updated.designation } : current);
-      setSelectedEmployee((current) => current ? { ...current, designation: updated.designation } : current);
-      setEditDesignationOpen(false);
-      toast.success("Designation updated successfully.");
+      setEmployeeLeaves((current: any) => current ? {
+        ...current,
+        employeeId: updated.employeeId,
+        employeeName: updated.name,
+        phone: updated.phone,
+        designation: updated.designation,
+        stationName: updated.stationName,
+        dob: updated.dob,
+        doa: updated.doa,
+        doj: updated.doj,
+      } : current);
+      setSelectedEmployee((current) => current ? { ...current, ...updated } : current);
+      setEditDetailsOpen(false);
+      toast.success("Employee details updated successfully.");
       await load();
       window.dispatchEvent(new CustomEvent("app:refresh", {
         detail: { pages: ["dashboard", "stations", "employees", "reports"] },
       }));
     } finally {
-      setSavingDesignation(false);
+      setSavingDetails(false);
     }
   }
   const [q, setQ] = useState("");
@@ -270,8 +298,8 @@ function EmployeesPage() {
                   <div>Leaves Used This Month: <strong>{employeeLeaves.leavesUsedThisMonth ?? 0}</strong></div>
                   <div>Current Status: <strong>{employeeLeaves.currentStatus ?? "Present"}</strong></div>
                 </div>
-                <Button className="mb-4" onClick={openDesignationEditor}>
-                  Edit Designation
+                <Button className="mb-4" onClick={openDetailsEditor}>
+                  Edit Employee Details
                 </Button>
 
                 <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
@@ -316,44 +344,77 @@ function EmployeesPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={editDesignationOpen} onOpenChange={setEditDesignationOpen}>
-        <DialogContent className="sm:max-w-md">
+      <Dialog open={editDetailsOpen} onOpenChange={setEditDetailsOpen}>
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Edit Designation</DialogTitle>
+            <DialogTitle>Edit Employee Details</DialogTitle>
             <DialogDescription>
-              Update only the designation. Employee ID and station will not change.
+              Change employee ID, name, phone, designation, station and service dates.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="rounded-lg bg-muted/40 px-3 py-2 text-sm">
-              Current Designation: <strong>{employeeLeaves?.designation ?? selectedEmployee?.designation ?? "-"}</strong>
-            </div>
-            <Select value={designationChoice} onValueChange={setDesignationChoice}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              placeholder="Employee ID"
+              value={editForm.employeeId}
+              onChange={(event) => setEditForm({ ...editForm, employeeId: event.target.value })}
+            />
+            <Input
+              placeholder="Employee name"
+              value={editForm.name}
+              onChange={(event) => setEditForm({ ...editForm, name: event.target.value })}
+            />
+            <Input
+              placeholder="Phone number"
+              value={editForm.phone}
+              onChange={(event) => setEditForm({ ...editForm, phone: event.target.value })}
+            />
+            <Input
+              placeholder="Designation"
+              value={editForm.designation}
+              onChange={(event) => setEditForm({ ...editForm, designation: event.target.value })}
+            />
+            <Select
+              value={editForm.stationId}
+              onValueChange={(value) => setEditForm({ ...editForm, stationId: value })}
+            >
               <SelectTrigger>
-                <SelectValue placeholder="Select designation" />
+                <SelectValue placeholder="Station" />
               </SelectTrigger>
               <SelectContent>
-                {designations.filter((designation) => designation !== "Other").map((designation) => (
-                  <SelectItem key={designation} value={designation}>
-                    {designation}
+                {stations.map((station) => (
+                  <SelectItem key={station.id} value={station.id}>
+                    {station.stationName}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {designationChoice === "Other" && (
-              <Input
-                value={customDesignation}
-                onChange={(event) => setCustomDesignation(event.target.value)}
-                placeholder="Enter designation"
-              />
+            <Input
+              type="date"
+              value={editForm.dob}
+              onChange={(event) => setEditForm({ ...editForm, dob: event.target.value })}
+            />
+            <Input
+              type="date"
+              value={editForm.doj}
+              onChange={(event) => setEditForm({ ...editForm, doj: event.target.value })}
+            />
+            <Input
+              type="date"
+              value={editForm.doa}
+              onChange={(event) => setEditForm({ ...editForm, doa: event.target.value })}
+            />
+            {editForm.employeeId !== (employeeLeaves?.employeeId ?? selectedEmployee?.employeeId ?? "") && (
+              <div className="sm:col-span-2 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                Leave history will be moved to the new employee ID automatically.
+              </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditDesignationOpen(false)} disabled={savingDesignation}>
+            <Button variant="outline" onClick={() => setEditDetailsOpen(false)} disabled={savingDetails}>
               Cancel
             </Button>
-            <Button onClick={saveDesignation} disabled={savingDesignation}>
-              {savingDesignation ? "Saving..." : "Save"}
+            <Button onClick={saveDetails} disabled={savingDetails}>
+              {savingDetails ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>

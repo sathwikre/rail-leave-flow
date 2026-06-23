@@ -158,6 +158,83 @@ export async function updateEmployeeDesignation(req, res) {
   res.json(formatEmployee(updated));
 }
 
+export async function updateEmployeeDetails(req, res) {
+  const currentEmployeeId = String(req.params.employeeId ?? "").trim();
+  if (!currentEmployeeId) return res.status(400).json({ message: "Employee ID is required" });
+
+  const existing = await Employee.findOne({ employeeId: currentEmployeeId }).lean();
+  if (!existing) return res.status(404).json({ message: "Employee not found" });
+
+  const nextEmployeeId = String(req.body?.employeeId ?? currentEmployeeId).trim();
+  const name = String(req.body?.name ?? existing.name ?? "").trim();
+  const phone = String(req.body?.phone ?? existing.phone ?? "").trim();
+  const designation = normalizeDesignation(req.body?.designation ?? existing.designation);
+
+  if (!nextEmployeeId) return res.status(400).json({ message: "Employee ID is required" });
+  if (!name) return res.status(400).json({ message: "Name is required" });
+  if (!designation) return res.status(400).json({ message: "Designation is required" });
+
+  if (nextEmployeeId !== currentEmployeeId) {
+    const duplicate = await Employee.findOne({ employeeId: nextEmployeeId }).lean();
+    if (duplicate) return res.status(409).json({ message: "Employee ID already exists" });
+  }
+
+  let stationName = String(req.body?.stationName ?? existing.stationName ?? "").trim();
+  let stationForSync = null;
+  if (req.body?.stationId) {
+    stationForSync = await Station.findById(req.body.stationId).lean();
+    if (!stationForSync) return res.status(400).json({ message: "Station not found" });
+    stationName = stationForSync.stationName;
+  } else if (stationName) {
+    stationForSync = await Station.findOne({ stationName }).lean();
+    if (!stationForSync) return res.status(400).json({ message: "Station not found" });
+  }
+  if (!stationName) return res.status(400).json({ message: "Station is required" });
+
+  const payload = {
+    employeeId: nextEmployeeId,
+    name,
+    phone,
+    designation,
+    stationName,
+    dob: parseOptionalDate(req.body?.dob),
+    doa: parseOptionalDate(req.body?.doa),
+    doj: parseOptionalDate(req.body?.doj),
+  };
+
+  const updated = await Employee.findOneAndUpdate(
+    { employeeId: currentEmployeeId },
+    { $set: payload },
+    { new: true, runValidators: true },
+  ).lean();
+
+  if (currentEmployeeId !== nextEmployeeId) {
+    await Promise.all([
+      LeaveRequest.updateMany({ employeeId: currentEmployeeId }, { $set: { employeeId: nextEmployeeId } }),
+      DesignationHistory.updateMany({ employeeId: currentEmployeeId }, { $set: { employeeId: nextEmployeeId } }),
+    ]);
+  }
+
+  if (existing.designation !== designation) {
+    await DesignationHistory.create({
+      employeeId: nextEmployeeId,
+      oldDesignation: existing.designation,
+      newDesignation: designation,
+      changedAt: new Date(),
+    });
+  }
+
+  const stationsToSync = new Set([existing.stationName, stationName].filter(Boolean));
+  await Promise.all(
+    [...stationsToSync].map(async (nameToSync) => {
+      const station = await Station.findOne({ stationName: nameToSync }).select("_id").lean();
+      if (station) await syncStationTotal(station._id);
+    }),
+  );
+
+  res.json(formatEmployee(updated));
+}
+
 export async function syncStationTotal(stationId) {
   // Use employeeStats service to count only valid employees for the station
   const { getEmployeesCountForStation } = await import("../services/employeeStatsService.js");
@@ -213,6 +290,12 @@ function normalizeDesignation(value) {
     SHGMASTER: "SHG-MASTER",
   };
   return normalized[key] ?? compact;
+}
+
+function parseOptionalDate(value) {
+  if (value === undefined) return undefined;
+  const date = String(value ?? "").trim();
+  return date ? new Date(date) : null;
 }
 
 function escapeRegExp(value) {

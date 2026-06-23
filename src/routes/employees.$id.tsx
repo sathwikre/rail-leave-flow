@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Building2, Phone, User } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -57,30 +57,28 @@ type EmployeeProfileData = {
   currentStatus?: string;
 };
 
-const designationOptions = [
-  "DY SS",
-  "SS",
-  "SM",
-  "SMR",
-  "APM",
-  "P/MAN",
-  "P/WOMAN",
-  "CTNC",
-  "SR.CLERK",
-  "S/MASTER",
-  "Other",
-];
+type Station = { id: string; stationName: string };
 
 function EmployeeProfile() {
   const params = Route.useParams();
+  const navigate = useNavigate();
   const id = (params as any).id as string | undefined;
 
   const [employee, setEmployee] = useState<EmployeeProfileData | null>(null);
+  const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(true);
   const [editOpen, setEditOpen] = useState(false);
-  const [designationChoice, setDesignationChoice] = useState("");
-  const [customDesignation, setCustomDesignation] = useState("");
-  const [savingDesignation, setSavingDesignation] = useState(false);
+  const [savingDetails, setSavingDetails] = useState(false);
+  const [editForm, setEditForm] = useState({
+    employeeId: "",
+    name: "",
+    phone: "",
+    designation: "",
+    stationId: "",
+    dob: "",
+    doa: "",
+    doj: "",
+  });
 
   async function loadEmployee(options?: { silent?: boolean }) {
     if (!id) return;
@@ -105,6 +103,8 @@ function EmployeeProfile() {
     let ignore = false;
     async function run() {
       if (ignore) return;
+      const stationRes = await fetch(apiUrl("/api/stations"), { cache: "no-store" });
+      if (!ignore && stationRes.ok) setStations(await stationRes.json());
       await loadEmployee();
     }
     run();
@@ -113,45 +113,56 @@ function EmployeeProfile() {
     };
   }, [id]);
 
-  function openDesignationEditor() {
+  function openDetailsEditor() {
     if (!employee) return;
-    const known = designationOptions.includes(employee.designation);
-    setDesignationChoice(known ? employee.designation : "Other");
-    setCustomDesignation(known ? "" : employee.designation);
+    const station = stations.find((item) => item.stationName === employee.stationName);
+    setEditForm({
+      employeeId: employee.employeeId,
+      name: employee.name,
+      phone: employee.phone ?? "",
+      designation: employee.designation,
+      stationId: station?.id ?? stations[0]?.id ?? "",
+      dob: employee.dob ?? "",
+      doa: employee.doa ?? "",
+      doj: employee.doj ?? "",
+    });
     setEditOpen(true);
   }
 
-  async function saveDesignation() {
+  async function saveDetails() {
     if (!employee) return;
-    const nextDesignation = designationChoice === "Other" ? customDesignation.trim() : designationChoice;
-    if (!nextDesignation) {
-      toast.error("Please select or enter a designation");
+    if (!editForm.employeeId.trim() || !editForm.name.trim() || !editForm.designation.trim() || !editForm.stationId) {
+      toast.error("Employee ID, name, designation and station are required");
       return;
     }
 
-    setSavingDesignation(true);
+    setSavingDetails(true);
     try {
-      const response = await fetch(apiUrl(`/api/employees/${employee.employeeId}/designation`), {
+      const response = await fetch(apiUrl(`/api/employees/${employee.employeeId}`), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ designation: nextDesignation }),
+        body: JSON.stringify(editForm),
       });
 
       if (!response.ok) {
-        toast.error(`Failed to update designation: ${await response.text()}`);
+        toast.error(`Failed to update employee: ${await response.text()}`);
         return;
       }
 
       const updated = await response.json();
-      setEmployee((current) => current ? { ...current, designation: updated.designation } : current);
+      setEmployee((current) => current ? { ...current, ...updated } : current);
       setEditOpen(false);
-      toast.success("Designation updated successfully.");
-      await loadEmployee({ silent: true });
+      toast.success("Employee details updated successfully.");
+      if (updated.employeeId !== employee.employeeId) {
+        navigate({ to: "/employees/$id", params: { id: updated.employeeId } });
+      } else {
+        await loadEmployee({ silent: true });
+      }
       window.dispatchEvent(new CustomEvent("app:refresh", {
         detail: { pages: ["dashboard", "stations", "employees", "reports"] },
       }));
     } finally {
-      setSavingDesignation(false);
+      setSavingDetails(false);
     }
   }
 
@@ -207,8 +218,8 @@ function EmployeeProfile() {
             <Row icon={User} label="DOA" value={employee.doa ?? "-"} />
             <Row icon={Phone} label="Phone Number" value={employee.phone} />
           </div>
-          <Button className="mt-5 w-full" onClick={openDesignationEditor}>
-            Edit Designation
+          <Button className="mt-5 w-full" onClick={openDetailsEditor}>
+            Edit Employee Details
           </Button>
         </div>
 
@@ -267,43 +278,76 @@ function EmployeeProfile() {
       </div>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Edit Designation</DialogTitle>
+            <DialogTitle>Edit Employee Details</DialogTitle>
             <DialogDescription>
-              Update only the designation for {employee.name}. Employee ID and station remain unchanged.
+              Change employee ID, name, phone, designation, station and service dates.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
-            <div className="rounded-lg bg-muted/40 px-3 py-2 text-sm">
-              Current Designation: <strong>{employee.designation}</strong>
-            </div>
-            <Select value={designationChoice} onValueChange={setDesignationChoice}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Input
+              placeholder="Employee ID"
+              value={editForm.employeeId}
+              onChange={(event) => setEditForm({ ...editForm, employeeId: event.target.value })}
+            />
+            <Input
+              placeholder="Employee name"
+              value={editForm.name}
+              onChange={(event) => setEditForm({ ...editForm, name: event.target.value })}
+            />
+            <Input
+              placeholder="Phone number"
+              value={editForm.phone}
+              onChange={(event) => setEditForm({ ...editForm, phone: event.target.value })}
+            />
+            <Input
+              placeholder="Designation"
+              value={editForm.designation}
+              onChange={(event) => setEditForm({ ...editForm, designation: event.target.value })}
+            />
+            <Select
+              value={editForm.stationId}
+              onValueChange={(value) => setEditForm({ ...editForm, stationId: value })}
+            >
               <SelectTrigger>
-                <SelectValue placeholder="Select designation" />
+                <SelectValue placeholder="Station" />
               </SelectTrigger>
               <SelectContent>
-                {designationOptions.map((designation) => (
-                  <SelectItem key={designation} value={designation}>
-                    {designation}
+                {stations.map((station) => (
+                  <SelectItem key={station.id} value={station.id}>
+                    {station.stationName}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            {designationChoice === "Other" && (
-              <Input
-                value={customDesignation}
-                onChange={(event) => setCustomDesignation(event.target.value)}
-                placeholder="Enter designation"
-              />
+            <Input
+              type="date"
+              value={editForm.dob}
+              onChange={(event) => setEditForm({ ...editForm, dob: event.target.value })}
+            />
+            <Input
+              type="date"
+              value={editForm.doj}
+              onChange={(event) => setEditForm({ ...editForm, doj: event.target.value })}
+            />
+            <Input
+              type="date"
+              value={editForm.doa}
+              onChange={(event) => setEditForm({ ...editForm, doa: event.target.value })}
+            />
+            {editForm.employeeId !== employee.employeeId && (
+              <div className="sm:col-span-2 rounded-lg bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                Leave history will be moved to the new employee ID automatically.
+              </div>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={savingDesignation}>
+            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={savingDetails}>
               Cancel
             </Button>
-            <Button onClick={saveDesignation} disabled={savingDesignation}>
-              {savingDesignation ? "Saving..." : "Save"}
+            <Button onClick={saveDetails} disabled={savingDetails}>
+              {savingDetails ? "Saving..." : "Save"}
             </Button>
           </DialogFooter>
         </DialogContent>
