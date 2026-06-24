@@ -43,10 +43,21 @@ type LeaveRequest = {
   source?: "Manual" | "Email";
 };
 
+type EmployeeOption = {
+  employeeId: string;
+  name: string;
+  designation?: string;
+  stationName?: string;
+  phone?: string;
+};
+
 function LeaveRequestsPage() {
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ employeeId: "", fromDate: "", toDate: "", reason: "", reasonType: "Casual Leave", customReason: "" });
+  const [employeeSearch, setEmployeeSearch] = useState("");
+  const [employeeSearchOpen, setEmployeeSearchOpen] = useState(false);
   const [employeeInfo, setEmployeeInfo] = useState<null | {
     name: string;
     designation: string;
@@ -75,6 +86,20 @@ function LeaveRequestsPage() {
     if (to < from) return 0;
     return Math.floor((to.getTime() - from.getTime()) / 86400000) + 1;
   }, [form.fromDate, form.toDate]);
+
+  const employeeMatches = useMemo(() => {
+    const query = employeeSearch.trim().toLowerCase();
+    if (!query) return employees.slice(0, 8);
+
+    return employees
+      .filter((employee) =>
+        employee.name.toLowerCase().includes(query) ||
+        employee.employeeId.toLowerCase().includes(query) ||
+        (employee.stationName ?? "").toLowerCase().includes(query) ||
+        (employee.phone ?? "").toLowerCase().includes(query),
+      )
+      .slice(0, 8);
+  }, [employeeSearch, employees]);
 
   // fetch employee info when employeeId changes (debounced)
   useEffect(() => {
@@ -139,6 +164,7 @@ function LeaveRequestsPage() {
 
   useEffect(() => {
     loadRequests();
+    loadEmployees();
     const iv = setInterval(loadRequests, 30000);
     return () => clearInterval(iv);
   }, []);
@@ -148,9 +174,45 @@ function LeaveRequestsPage() {
     if (response.ok) setRequests(await response.json());
   }
 
+  async function loadEmployees() {
+    const response = await fetch(apiUrl("/api/employees"), { cache: "no-store" });
+    if (!response.ok) return;
+
+    const data = await response.json();
+    setEmployees(
+      Array.isArray(data)
+        ? data
+            .filter((employee) => employee?.employeeId && employee?.name)
+            .map((employee) => ({
+              employeeId: employee.employeeId,
+              name: employee.name,
+              designation: employee.designation,
+              stationName: employee.stationName,
+              phone: employee.phone,
+            }))
+        : [],
+    );
+  }
+
+  function selectEmployee(employee: EmployeeOption) {
+    setForm((current) => ({ ...current, employeeId: employee.employeeId }));
+    setEmployeeSearch(`${employee.name} (${employee.employeeId})`);
+    setEmployeeSearchOpen(false);
+    setEmployeeNotFound(false);
+  }
+
+  function resetLeaveForm() {
+    setForm({ employeeId: "", fromDate: "", toDate: "", reason: "", reasonType: "Casual Leave", customReason: "" });
+    setEmployeeSearch("");
+    setEmployeeSearchOpen(false);
+    setEmployeeInfo(null);
+    setEmployeeNotFound(false);
+    setAnalysis(null);
+  }
+
   async function createLeave() {
     if (!form.employeeId || !form.fromDate || !form.toDate || !form.reasonType) {
-      toast.error("Employee ID, dates and reason are required");
+      toast.error("Employee name, dates and reason are required");
       return;
     }
     if (form.reasonType === "Others" && !form.customReason) {
@@ -178,7 +240,7 @@ function LeaveRequestsPage() {
     }
 
     toast.success("Leave request created");
-    setForm({ employeeId: "", fromDate: "", toDate: "", reason: "", reasonType: "Casual Leave", customReason: "" });
+    resetLeaveForm();
     setShowForm(false);
     const created = await response.json();
     await loadRequests();
@@ -279,16 +341,48 @@ function LeaveRequestsPage() {
       {showForm && (
         <div className="mb-6 rounded-lg border border-border bg-card p-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-            <div>
+            <div className="relative">
               <Input
-                placeholder="Employee ID"
-                value={form.employeeId}
-                onChange={(event) => setForm({ ...form, employeeId: event.target.value })}
+                placeholder="Type employee name..."
+                value={employeeSearch}
+                onChange={(event) => {
+                  setEmployeeSearch(event.target.value);
+                  setEmployeeSearchOpen(true);
+                  setForm((current) => ({ ...current, employeeId: "" }));
+                  setEmployeeInfo(null);
+                  setAnalysis(null);
+                  setEmployeeNotFound(false);
+                }}
+                onFocus={() => setEmployeeSearchOpen(true)}
+                onBlur={() => window.setTimeout(() => setEmployeeSearchOpen(false), 120)}
               />
+              {employeeSearchOpen && employeeSearch && (
+                <div className="absolute left-0 right-0 top-11 z-20 max-h-72 overflow-y-auto rounded-xl border border-border bg-popover p-1 shadow-lg">
+                  {employeeMatches.length > 0 ? (
+                    employeeMatches.map((employee) => (
+                      <button
+                        key={employee.employeeId}
+                        type="button"
+                        className="w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-muted"
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => selectEmployee(employee)}
+                      >
+                        <div className="font-semibold">{employee.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {employee.employeeId} · {employee.designation ?? "-"} · {employee.stationName ?? "-"}
+                        </div>
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-3 py-4 text-sm text-muted-foreground">No employees found.</div>
+                  )}
+                </div>
+              )}
               <div className="mt-2 text-sm">
                 {employeeInfo ? (
                   <div className="space-y-1 text-sm">
                     <div className="font-semibold">{employeeInfo.name}</div>
+                    <div className="text-xs">Employee ID: <strong>{form.employeeId}</strong></div>
                     <div className="text-xs text-muted-foreground">{employeeInfo.designation} — {employeeInfo.stationName}</div>
                     <div className="text-xs">Latest Leave Taken: <strong>{employeeInfo.lastLeaveDate ?? "-"}</strong></div>
                     <div className="text-xs">Leaves Used This Month: <strong>{employeeInfo.leavesUsedThisMonth ?? 0}</strong></div>
@@ -297,7 +391,7 @@ function LeaveRequestsPage() {
                 ) : employeeNotFound ? (
                   <div className="text-destructive font-semibold">Employee not found.</div>
                 ) : (
-                  <div className="text-xs text-muted-foreground">Enter Employee ID to validate</div>
+                  <div className="text-xs text-muted-foreground">Search and select employee name</div>
                 )}
               </div>
             </div>
@@ -358,7 +452,7 @@ function LeaveRequestsPage() {
             <Button className="mr-2" onClick={createLeave} disabled={!form.employeeId || employeeNotFound || !form.fromDate || !form.toDate}>
               Create Pending Request
             </Button>
-            <Button variant="outline" onClick={() => { setShowForm(false); setForm({ employeeId: "", fromDate: "", toDate: "", reason: "", reasonType: "Casual Leave", customReason: "" }); setEmployeeInfo(null); setAnalysis(null); }}>
+            <Button variant="outline" onClick={() => { setShowForm(false); resetLeaveForm(); }}>
               Cancel
             </Button>
           </div>
