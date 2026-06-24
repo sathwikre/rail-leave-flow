@@ -415,11 +415,7 @@ function LeaveRequestsPage() {
                 <SelectContent>
                   <SelectItem value="Casual Leave">Casual Leave</SelectItem>
                   <SelectItem value="Sick Leave">Sick Leave</SelectItem>
-                  <SelectItem value="Emergency Leave">Emergency Leave</SelectItem>
-                  <SelectItem value="Family Function">Family Function</SelectItem>
-                  <SelectItem value="Medical Leave">Medical Leave</SelectItem>
-                  <SelectItem value="Personal Work">Personal Work</SelectItem>
-                  <SelectItem value="Official Duty">Official Duty</SelectItem>
+                  <SelectItem value="LAP">LAP</SelectItem>
                   <SelectItem value="Others">Others</SelectItem>
                 </SelectContent>
               </Select>
