@@ -413,7 +413,7 @@ function LeaveRequestsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Casual Leave">Casual Leave</SelectItem>
+                  <SelectItem value="Casual Leave">CL</SelectItem>
                   <SelectItem value="Sick Leave">Sick Leave</SelectItem>
                   <SelectItem value="LAP">LAP</SelectItem>
                   <SelectItem value="Others">Others</SelectItem>
