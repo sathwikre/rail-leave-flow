@@ -173,6 +173,16 @@ if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("app:refresh"));
       }
     });
+    ["leave:created", "leave:approved", "leave:rejected", "leave:deleted"].forEach((eventName) => {
+      es.addEventListener(eventName, (e: MessageEvent) => {
+        try {
+          const data = e.data ? JSON.parse(e.data) : null;
+          window.dispatchEvent(new CustomEvent(eventName, { detail: data }));
+        } catch (err) {
+          window.dispatchEvent(new CustomEvent(eventName));
+        }
+      });
+    });
   } catch (e) {
     // ignore if EventSource not supported
   }

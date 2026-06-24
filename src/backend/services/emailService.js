@@ -64,6 +64,13 @@ export async function checkAndProcessEmails() {
     imap.once("error", reject);
   });
 
+  imap.on("error", (err) => {
+    console.warn("IMAP connection error", err);
+  });
+  imap.once("end", () => {
+    console.log("IMAP connection ended");
+  });
+
   imap.connect();
   try {
     await ready;

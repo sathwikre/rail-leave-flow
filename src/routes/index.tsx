@@ -3,7 +3,8 @@ import { Building2, CheckCircle2, Users } from "lucide-react";
 import { useMemo } from "react";
 import { Input } from "@/components/ui/input";
 import { AlertDialog, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogFooter, AlertDialogAction, AlertDialogCancel } from "@/components/ui/alert-dialog";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import { AppLayout, StatusBadge } from "@/components/AppLayout";
 import { apiUrl } from "@/lib/api";
 import { StatCard } from "@/components/StatCard";
@@ -32,34 +33,98 @@ type LeaveRequest = {
   status: "Pending" | "Approved" | "Rejected";
 };
 
-function Dashboard() {
-  const [stats, setStats] = useState<DashboardStats>({
-    totalStations: 0,
-    totalEmployees: 0,
-    employeesOnLeaveToday: 0,
-    pendingLeaveRequests: 0,
-    recentlyApprovedLeaves: [],
-  });
+type PendingLeaveRequest = {
+  id: string;
+  employeeId: string;
+  employeeName: string;
+  designation: string;
+  stationName: string;
+  fromDate: string;
+  toDate: string;
+  days: number;
+  leaveType: string;
+  status: "Pending";
+  employeesAlreadyOnLeave: number;
+  recentLeave: null | {
+    fromDate: string;
+    toDate: string;
+    leaveType: string;
+    days: number;
+    status: "Approved" | "Rejected";
+  };
+};
 
-  const [onLeaveRows, setOnLeaveRows] = useState<
-    {
-      employeeId: string;
-      employeeName: string;
-      stationName: string;
-      designation: string;
-      fromDate: string;
-      toDate: string;
-      days: number;
-    }[]
-  >([]);
+type OnLeaveRow = {
+  employeeId: string;
+  employeeName: string;
+  stationName: string;
+  designation: string;
+  fromDate: string;
+  toDate: string;
+  days: number;
+};
+
+type DashboardCache = {
+  stats?: DashboardStats;
+  selectedDate?: string;
+  onLeaveRows?: OnLeaveRow[];
+  onLeaveCount?: number;
+  sickLeavesCount?: number;
+  pendingRequests?: PendingLeaveRequest[];
+};
+
+const DASHBOARD_CACHE_KEY = "railway-dashboard-cache-v1";
+
+const emptyStats: DashboardStats = {
+  totalStations: 0,
+  totalEmployees: 0,
+  employeesOnLeaveToday: 0,
+  pendingLeaveRequests: 0,
+  recentlyApprovedLeaves: [],
+};
+
+function Dashboard() {
+  const cachedDashboard = readDashboardCache();
+  const initialSelectedDate = todayInputDate();
+  const canUseDateCache = cachedDashboard.selectedDate === initialSelectedDate;
+  const [stats, setStats] = useState<DashboardStats>(cachedDashboard.stats ?? emptyStats);
+
+  const [onLeaveRows, setOnLeaveRows] = useState<OnLeaveRow[]>(canUseDateCache ? cachedDashboard.onLeaveRows ?? [] : []);
   const [selectedDate, setSelectedDate] = useState(() => {
-    const d = new Date();
-    return d.toISOString().slice(0, 10);
+    return initialSelectedDate;
   });
-  const [onLeaveCount, setOnLeaveCount] = useState(0);
-  const [sickLeavesCount, setSickLeavesCount] = useState(0);
+  const selectedDateRef = useRef(selectedDate);
+  const [onLeaveCount, setOnLeaveCount] = useState(canUseDateCache ? cachedDashboard.onLeaveCount ?? cachedDashboard.onLeaveRows?.length ?? 0 : 0);
+  const [sickLeavesCount, setSickLeavesCount] = useState(canUseDateCache ? cachedDashboard.sickLeavesCount ?? 0 : 0);
+  const [pendingRequests, setPendingRequests] = useState<PendingLeaveRequest[]>(canUseDateCache ? cachedDashboard.pendingRequests ?? [] : []);
+  const [statsLoaded, setStatsLoaded] = useState(Boolean(cachedDashboard.stats));
+  const [onLeaveLoaded, setOnLeaveLoaded] = useState(canUseDateCache && Boolean(cachedDashboard.onLeaveRows));
+  const [sickLeavesLoaded, setSickLeavesLoaded] = useState(canUseDateCache && typeof cachedDashboard.sickLeavesCount === "number");
+  const [pendingRequestsLoaded, setPendingRequestsLoaded] = useState(canUseDateCache && Boolean(cachedDashboard.pendingRequests));
+  const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
   const [showSickModal, setShowSickModal] = useState(false);
   const [sickRows, setSickRows] = useState<any[]>([]);
+
+  async function loadDashboardStats() {
+    try {
+      const response = await fetch(apiUrl("/api/dashboard/stats"), { cache: "no-store" });
+      if (!response.ok) return;
+      const data = await response.json();
+      const nextStats = {
+        totalStations: data.totalStations,
+        totalEmployees: data.totalEmployees,
+        employeesOnLeaveToday: data.onLeaveToday,
+        pendingLeaveRequests: data.pendingRequests,
+        recentlyApprovedLeaves: [],
+      };
+      setStats(nextStats);
+      writeDashboardCache({ stats: nextStats });
+      setStatsLoaded(true);
+      console.log("Dashboard total employees:", data.totalEmployees);
+    } catch (error) {
+      console.warn("Failed to load dashboard data", error);
+    }
+  }
 
   async function loadOnLeaveDetailsForDate(date: string) {
     try {
@@ -68,6 +133,8 @@ function Dashboard() {
       const list = await r.json();
       setOnLeaveRows(list);
       setOnLeaveCount(list.length);
+      setOnLeaveLoaded(true);
+      writeDashboardCache({ selectedDate: date, onLeaveRows: list, onLeaveCount: list.length });
     } catch (e) {
       console.warn("Failed to load on-leave list", e);
     }
@@ -79,33 +146,91 @@ function Dashboard() {
       if (!r.ok) return;
       const list = await r.json();
       setSickLeavesCount(list.length);
+      setSickLeavesLoaded(true);
+      writeDashboardCache({ selectedDate: date, sickLeavesCount: list.length });
     } catch (e) {
       console.warn("Failed to load sick leaves", e);
     }
   }
 
+  async function loadPendingRequests(date: string) {
+    try {
+      const r = await fetch(apiUrl(`/api/leave-requests/pending?date=${encodeURIComponent(date)}`), { cache: "no-store" });
+      if (!r.ok) return;
+      const list = await r.json();
+      setPendingRequests(list);
+      setPendingRequestsLoaded(true);
+      writeDashboardCache({ selectedDate: date, pendingRequests: list });
+    } catch (e) {
+      console.warn("Failed to load pending requests", e);
+    }
+  }
+
+  async function refreshDashboard(date = selectedDateRef.current) {
+    await Promise.all([
+      loadDashboardStats(),
+      loadOnLeaveDetailsForDate(date),
+      loadSickCountForDate(date),
+      loadPendingRequests(date),
+    ]);
+  }
+
+  async function approvePendingRequest(request: PendingLeaveRequest) {
+    setProcessingRequestId(request.id);
+    try {
+      const analysisResponse = await fetch(apiUrl(`/api/leave/${request.id}/analysis`), { cache: "no-store" });
+      if (!analysisResponse.ok) {
+        toast.error("Unable to fetch leave analysis");
+        return;
+      }
+
+      const analysis = await analysisResponse.json();
+      const force = analysis.totalAfterApproval > 4;
+      const response = await fetch(apiUrl(`/api/leave/${request.id}/approve${force ? "?force=true" : ""}`), {
+        method: "PATCH",
+      });
+      if (!response.ok) {
+        toast.error("Unable to approve leave request");
+        return;
+      }
+
+      toast.success("Leave approved");
+      window.dispatchEvent(new CustomEvent("leave:approved", { detail: { employeeId: request.employeeId } }));
+      await refreshDashboard();
+    } catch (e) {
+      console.warn("Failed to approve leave request", e);
+      toast.error("Unable to approve leave request");
+    } finally {
+      setProcessingRequestId(null);
+    }
+  }
+
+  async function rejectPendingRequest(request: PendingLeaveRequest) {
+    setProcessingRequestId(request.id);
+    try {
+      const response = await fetch(apiUrl(`/api/leave/${request.id}/reject`), { method: "PATCH" });
+      if (!response.ok) {
+        toast.error("Unable to reject leave request");
+        return;
+      }
+
+      toast.success("Leave rejected");
+      window.dispatchEvent(new CustomEvent("leave:rejected", { detail: { employeeId: request.employeeId } }));
+      await refreshDashboard();
+    } catch (e) {
+      console.warn("Failed to reject leave request", e);
+      toast.error("Unable to reject leave request");
+    } finally {
+      setProcessingRequestId(null);
+    }
+  }
+
+  useEffect(() => {
+    selectedDateRef.current = selectedDate;
+  }, [selectedDate]);
+
   useEffect(() => {
     let ignore = false;
-
-    async function load() {
-      try {
-        const response = await fetch(apiUrl("/api/dashboard/stats"), { cache: "no-store" });
-        if (!response.ok) return;
-        const data = await response.json();
-        if (!ignore) {
-          setStats({
-            totalStations: data.totalStations,
-            totalEmployees: data.totalEmployees,
-            employeesOnLeaveToday: data.onLeaveToday,
-            pendingLeaveRequests: data.pendingRequests,
-            recentlyApprovedLeaves: [],
-          });
-          console.log("Dashboard total employees:", data.totalEmployees);
-        }
-      } catch (error) {
-        console.warn("Failed to load dashboard data", error);
-      }
-    }
 
     async function loadOnLeaveDetails() {
       await loadOnLeaveDetailsForDate(selectedDate);
@@ -115,14 +240,14 @@ function Dashboard() {
       await loadSickCountForDate(selectedDate);
     }
 
-    load();
+    loadDashboardStats();
     loadOnLeaveDetails();
     loadSickCount();
-    const refreshEvents = ["leave:approved", "leave:rejected", "leave:created"];
+    loadPendingRequests(selectedDate);
+    const refreshEvents = ["leave:approved", "leave:rejected", "leave:created", "leave:deleted"];
     function onRefresh() {
-      load();
-      loadOnLeaveDetailsForDate(selectedDate);
-      loadSickCountForDate(selectedDate);
+      const currentDate = selectedDateRef.current;
+      refreshDashboard(currentDate);
     }
     window.addEventListener("focus", onRefresh);
     window.addEventListener("focus", loadOnLeaveDetails);
@@ -152,6 +277,8 @@ function Dashboard() {
           if (!ignore) {
             setOnLeaveRows(list);
             setOnLeaveCount(list.length);
+            setOnLeaveLoaded(true);
+            writeDashboardCache({ selectedDate, onLeaveRows: list, onLeaveCount: list.length });
           }
         }
       } catch (e) {
@@ -161,11 +288,16 @@ function Dashboard() {
         const s = await fetch(apiUrl(`/api/dashboard/sick-leaves?date=${selectedDate}`), { cache: "no-store" });
         if (s.ok) {
           const sl = await s.json();
-          if (!ignore) setSickLeavesCount(sl.length);
+          if (!ignore) {
+            setSickLeavesCount(sl.length);
+            setSickLeavesLoaded(true);
+            writeDashboardCache({ selectedDate, sickLeavesCount: sl.length });
+          }
         }
       } catch (e) {
         console.warn(e);
       }
+      if (!ignore) await loadPendingRequests(selectedDate);
     }
     refreshForDate();
     return () => { ignore = true; };
@@ -182,11 +314,11 @@ function Dashboard() {
       }
     >
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Total Stations" value={stats.totalStations} icon={Building2} tone="primary" />
-        <StatCard label="Total Employees" value={stats.totalEmployees} icon={Users} tone="success" />
+        <StatCard label="Total Stations" value={statsLoaded ? stats.totalStations : "..."} icon={Building2} tone="primary" />
+        <StatCard label="Total Employees" value={statsLoaded ? stats.totalEmployees : "..."} icon={Users} tone="success" />
         <StatCard
           label={`On Leave`}
-          value={onLeaveCount}
+          value={onLeaveLoaded ? onLeaveCount : "..."}
           icon={CheckCircle2}
           tone="warning"
         />
@@ -205,7 +337,7 @@ function Dashboard() {
         >
           <StatCard
             label={`Sick Leaves Today`}
-            value={sickLeavesCount}
+            value={sickLeavesLoaded ? sickLeavesCount : "..."}
             icon={CheckCircle2}
             tone="destructive"
           />
@@ -215,6 +347,90 @@ function Dashboard() {
       <div className="mt-4 flex items-center gap-3">
         <div className="text-sm font-medium">Selected Date:</div>
         <Input type="date" value={selectedDate} onChange={(e) => setSelectedDate(e.target.value)} />
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
+        <div className="p-5 border-b border-border">
+          <h2 className="font-display text-lg font-bold">
+            PENDING REQUESTS ON SELECTED DATE ({pendingRequestsLoaded ? pendingRequests.length : "..."})
+          </h2>
+        </div>
+        <div className="p-5">
+          {pendingRequests.length > 0 ? (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+              {pendingRequests.map((request) => (
+                <div key={request.id} className="rounded-lg border border-border bg-background p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="font-display text-base font-bold">{request.employeeName}</div>
+                      <div className="mt-1 text-xs font-mono text-muted-foreground">{request.employeeId}</div>
+                      <div className="mt-1 text-sm text-muted-foreground">
+                        {request.designation} - {request.stationName}
+                      </div>
+                    </div>
+                    <StatusBadge status={request.status} />
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+                    <div className="rounded-md border border-border bg-muted/20 p-3">
+                      <div className="text-xs uppercase text-muted-foreground">Leave</div>
+                      <div className="mt-1 font-semibold">
+                        {formatShortDate(request.fromDate)} to {formatShortDate(request.toDate)}
+                      </div>
+                      <div className="mt-1 text-muted-foreground">
+                        {request.days} Days - {request.leaveType}
+                      </div>
+                    </div>
+                    <div className="rounded-md border border-border bg-muted/20 p-3">
+                      <div className="text-xs uppercase text-muted-foreground">Employees Already On Leave</div>
+                      <div className="mt-1 font-display text-2xl font-bold">{request.employeesAlreadyOnLeave}</div>
+                    </div>
+                    <div className="rounded-md border border-border bg-muted/20 p-3">
+                      <div className="text-xs uppercase text-muted-foreground">Actions</div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => approvePendingRequest(request)}
+                          disabled={processingRequestId === request.id}
+                        >
+                          Approve
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => rejectPendingRequest(request)}
+                          disabled={processingRequestId === request.id}
+                        >
+                          Reject
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 rounded-md border border-border p-3 text-sm">
+                    <div className="text-xs uppercase text-muted-foreground">Recent Leave Taken By This Employee</div>
+                    {request.recentLeave ? (
+                      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                        <span className="font-semibold">
+                          {formatShortDate(request.recentLeave.fromDate)} to {formatShortDate(request.recentLeave.toDate)}
+                        </span>
+                        <span>{request.recentLeave.leaveType}</span>
+                        <span>{request.recentLeave.days} Days</span>
+                        <StatusBadge status={request.recentLeave.status} />
+                      </div>
+                    ) : (
+                      <div className="mt-2 text-muted-foreground">No previous leave history.</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="py-4 text-sm text-muted-foreground">
+              {pendingRequestsLoaded ? "No pending requests." : "Loading pending requests..."}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="mt-6 rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
@@ -249,7 +465,7 @@ function Dashboard() {
               {onLeaveRows.length === 0 && (
                 <tr>
                   <td className="px-5 py-5 text-muted-foreground" colSpan={7}>
-                    No employees are on leave on this date.
+                    {onLeaveLoaded ? "No employees are on leave on this date." : "Loading leave details..."}
                   </td>
                 </tr>
               )}
@@ -315,5 +531,35 @@ function formatShortDate(dateStr: string) {
     return d.toLocaleDateString(undefined, { day: "2-digit", month: "short" });
   } catch (e) {
     return dateStr;
+  }
+}
+
+function todayInputDate() {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function readDashboardCache(): DashboardCache {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const raw = window.localStorage.getItem(DASHBOARD_CACHE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function writeDashboardCache(partial: DashboardCache) {
+  if (typeof window === "undefined") return;
+
+  try {
+    const current = readDashboardCache();
+    window.localStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify({ ...current, ...partial }));
+  } catch (e) {
+    // Ignore cache write failures. Fresh API data still renders normally.
   }
 }

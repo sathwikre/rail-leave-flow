@@ -1,8 +1,11 @@
 import { Employee } from "../models/employeeModel.js";
 import { DesignationHistory } from "../models/designationHistoryModel.js";
+import { EmployeeRemark } from "../models/employeeRemarkModel.js";
 import { LeaveRequest } from "../models/leaveRequestModel.js";
 import { Station } from "../models/stationModel.js";
 import { lastLeaveDate, leavesUsedThisMonth, MONTHLY_LEAVE_LIMIT } from "./leaveMetrics.js";
+
+const remarkTypes = ["Excellent", "Good", "General", "Warning", "Disciplinary"];
 
 export async function getEmployees(req, res) {
   const q = String(req.query.q ?? "").trim();
@@ -108,6 +111,46 @@ export async function getEmployeeLeaves(req, res) {
   });
 }
 
+export async function getEmployeeRemarks(req, res) {
+  const employeeId = String(req.params.id ?? "").trim();
+  if (!employeeId) return res.status(400).json({ message: "Employee ID is required" });
+
+  const employee = await Employee.findOne({ employeeId }).lean();
+  if (!employee) return res.status(404).json({ message: "Employee not found" });
+
+  const remarks = await EmployeeRemark.find({ employeeId }).sort({ date: -1, createdAt: -1 }).lean();
+  res.json(remarks.map(formatRemark));
+}
+
+export async function createEmployeeRemark(req, res) {
+  const employeeId = String(req.params.id ?? "").trim();
+  const remarkType = String(req.body?.remarkType ?? "").trim();
+  const title = String(req.body?.title ?? "").trim();
+  const description = String(req.body?.description ?? "").trim();
+  const date = String(req.body?.date ?? "").trim();
+  const addedBy = String(req.body?.addedBy ?? "Traffic Inspector").trim() || "Traffic Inspector";
+
+  if (!employeeId) return res.status(400).json({ message: "Employee ID is required" });
+  if (!remarkTypes.includes(remarkType)) return res.status(400).json({ message: "Invalid remark type" });
+  if (!title) return res.status(400).json({ message: "Remark title is required" });
+  if (!description) return res.status(400).json({ message: "Remark description is required" });
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return res.status(400).json({ message: "Valid remark date is required" });
+
+  const employee = await Employee.findOne({ employeeId }).lean();
+  if (!employee) return res.status(404).json({ message: "Employee not found" });
+
+  const remark = await EmployeeRemark.create({
+    employeeId,
+    remarkType,
+    title,
+    description,
+    date,
+    addedBy,
+  });
+
+  res.status(201).json(formatRemark(remark.toObject()));
+}
+
 export async function createEmployee(req, res) {
   const payload = {
     employeeId: req.body.employeeId ?? req.body.id,
@@ -131,7 +174,7 @@ export async function createEmployee(req, res) {
 }
 
 export async function updateEmployeeDesignation(req, res) {
-  const employeeId = String(req.params.employeeId ?? "").trim();
+  const employeeId = String(req.params.id ?? "").trim();
   const designation = normalizeDesignation(req.body?.designation);
 
   if (!employeeId) return res.status(400).json({ message: "Employee ID is required" });
@@ -193,6 +236,19 @@ function formatLeave(leave) {
     status: leave.status,
     source: leave.source ?? "Manual",
     createdAt: leave.createdAt,
+  };
+}
+
+function formatRemark(remark) {
+  return {
+    id: String(remark._id),
+    employeeId: remark.employeeId,
+    remarkType: remark.remarkType,
+    title: remark.title,
+    description: remark.description,
+    date: remark.date,
+    addedBy: remark.addedBy,
+    createdAt: remark.createdAt,
   };
 }
 

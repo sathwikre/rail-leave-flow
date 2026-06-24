@@ -1,0 +1,12 @@
+import { createApp } from './src/backend/app.js';
+const app = await createApp();
+const own = Object.getOwnPropertyNames(app);
+const syms = Object.getOwnPropertySymbols(app).map((s) => s.toString());
+console.log('ownProps', own.sort());
+console.log('symbols', syms);
+if (app._router) console.log('has _router', app._router.stack?.length);
+if (app.router) console.log('has router', app.router.stack?.length);
+if (app.stack) console.log('has stack', app.stack.length);
+if (app.handle) console.log('has handle');
+if (app.use) console.log('has use');
+console.log('route keys', Object.keys(app).slice(0,50));

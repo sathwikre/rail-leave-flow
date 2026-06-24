@@ -38,6 +38,77 @@ export async function getLeaves(req, res) {
   );
 }
 
+export async function getPendingLeaves(req, res) {
+  res.set("Cache-Control", "no-store");
+
+  const leaves = await LeaveRequest.find({ status: "Pending" }).sort({ createdAt: -1 }).lean();
+  const selectedDate = parseDateOnly(req.query.date);
+  const filteredLeaves = selectedDate
+    ? leaves.filter((leave) => {
+      const fromDate = parseDateOnly(leave.fromDate);
+      const toDate = parseDateOnly(leave.toDate);
+      return fromDate && toDate && selectedDate >= fromDate && selectedDate <= toDate;
+    })
+    : leaves;
+  const approvedLeaves = selectedDate
+    ? await LeaveRequest.find({ status: "Approved" }).lean()
+    : [];
+  const employeesAlreadyOnLeave = selectedDate
+    ? new Set(
+      approvedLeaves
+        .filter((leave) => dateCovers(leave, selectedDate))
+        .map((leave) => leave.employeeId),
+    ).size
+    : 0;
+  const recentLeaveByPendingId = new Map(
+    await Promise.all(
+      filteredLeaves.map(async (leave) => {
+        const recentLeave = await LeaveRequest.findOne({
+          _id: { $ne: leave._id },
+          employeeId: leave.employeeId,
+          status: { $in: ["Approved", "Rejected"] },
+          toDate: { $lt: leave.fromDate },
+        }).sort({ toDate: -1, createdAt: -1 }).lean();
+
+        return [String(leave._id), recentLeave];
+      }),
+    ),
+  );
+  const employees = await Employee.find({
+    employeeId: { $in: filteredLeaves.map((leave) => leave.employeeId) },
+  }).lean();
+  const employeeById = new Map(employees.map((employee) => [employee.employeeId, employee]));
+
+  res.json(
+    filteredLeaves.map((leave) => {
+      const employee = employeeById.get(leave.employeeId);
+      const recentLeave = recentLeaveByPendingId.get(String(leave._id));
+      return {
+        id: String(leave._id),
+        employeeId: leave.employeeId,
+        employeeName: employee?.name ?? leave.employeeId,
+        designation: employee?.designation ?? "",
+        stationName: employee?.stationName ?? "",
+        fromDate: leave.fromDate,
+        toDate: leave.toDate,
+        days: leave.days,
+        leaveType: leave.reasonType ?? leave.reason,
+        status: leave.status,
+        employeesAlreadyOnLeave,
+        recentLeave: recentLeave
+          ? {
+            fromDate: recentLeave.fromDate,
+            toDate: recentLeave.toDate,
+            leaveType: recentLeave.reasonType ?? recentLeave.reason,
+            days: recentLeave.days,
+            status: recentLeave.status,
+          }
+          : null,
+      };
+    }),
+  );
+}
+
 export async function getLeaveById(req, res) {
   const leave = await LeaveRequest.findById(req.params.id).lean();
   if (!leave) return res.status(404).json({ message: "Leave request not found" });
@@ -138,6 +209,7 @@ export async function createLeave(req, res) {
     designation: employee.designation,
     stationName: employee.stationName,
   });
+  req.app.emit("leave:created", { employeeId: leave.employeeId });
 }
 
 export async function approveLeave(req, res) {
@@ -178,6 +250,7 @@ export async function approveLeave(req, res) {
     const updatedLeave = await LeaveRequest.findByIdAndUpdate(applied._id, analysis, {
       new: true,
     }).lean();
+    req.app.emit("leave:approved", { employeeId: updatedLeave.employeeId });
     return res.json(formatLeave(updatedLeave));
   } catch (err) {
     console.warn("Failed to update analysis on approve:", err);
@@ -202,11 +275,13 @@ export async function rejectLeave(req, res) {
       totalAfterApproval: analysis.totalAfterApproval,
       recommendation: analysis.recommendation,
     }, { new: true }).lean();
+    req.app.emit("leave:rejected", { employeeId: updatedLeave.employeeId });
     return res.json(formatLeave(updatedLeave));
   } catch (err) {
     console.warn("Failed to update analysis on reject:", err);
   }
 
+  req.app.emit("leave:rejected", { employeeId: leave.employeeId });
   res.json(formatLeave(leave));
 }
 
@@ -214,6 +289,7 @@ export async function deleteLeave(req, res) {
   const leave = await LeaveRequest.findByIdAndDelete(req.params.id).lean();
   if (!leave) return res.status(404).json({ message: "Leave request not found" });
 
+  req.app.emit("leave:deleted", { employeeId: leave.employeeId });
   res.json(formatLeave(leave));
 }
 
@@ -239,6 +315,18 @@ function normalizeStatus(status) {
   if (value === "approved") return "Approved";
   if (value === "rejected") return "Rejected";
   return null;
+}
+
+function parseDateOnly(value) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(String(value))) return null;
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function dateCovers(leave, selectedDate) {
+  const fromDate = parseDateOnly(leave.fromDate);
+  const toDate = parseDateOnly(leave.toDate);
+  return fromDate && toDate && selectedDate >= fromDate && selectedDate <= toDate;
 }
 
 function formatLeave(leave) {

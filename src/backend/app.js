@@ -58,6 +58,10 @@ export async function createApp() {
     }
   }
 
+  ["leave:created", "leave:approved", "leave:rejected", "leave:deleted"].forEach((eventName) => {
+    app.on(eventName, (data) => broadcastEvent(eventName, data));
+  });
+
   // Admin import endpoint to replace employee data (preserves LeaveRequest collection)
   app.post("/api/admin/import-employees", async (req, res) => {
     try {

@@ -7,12 +7,14 @@ import {
   getLeaves,
   getLeaveById,
   getLeaveAnalysis,
+  getPendingLeaves,
   prospectiveAnalysis,
   rejectLeave
 } from "../controllers/leaveController.js";
 export const leaveRoutes = Router();
 
 leaveRoutes.get("/", getLeaves);
+leaveRoutes.get("/pending", getPendingLeaves);
 leaveRoutes.get("/:id", getLeaveById);
 leaveRoutes.get("/:id/analysis", getLeaveAnalysis);
 leaveRoutes.post("/analysis", prospectiveAnalysis);

@@ -9,15 +9,15 @@ const server = app.listen(config.port, () => {
   console.log(`Backend API running on http://localhost:${config.port}`);
 });
 
-// Start email cron if credentials are configured
-if (config.mailUser && config.mailPass) {
-  try {
-    startEmailCron();
-    console.log("Email cron started");
-  } catch (err) {
-    console.warn("Failed to start email cron", err);
-  }
-}
+// Email cron startup disabled to prevent IMAP-related crashes during local runs
+// if (config.mailUser && config.mailPass) {
+//   try {
+//     startEmailCron();
+//     console.log("Email cron started");
+//   } catch (err) {
+//     console.warn("Failed to start email cron", err);
+//   }
+// }
 
 async function shutdown() {
   server.close(async () => {
