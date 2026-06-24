@@ -76,21 +76,6 @@ function EmployeesPage() {
   const [employeeLeaves, setEmployeeLeaves] = useState<any | null>(null);
   const [employeeModalOpen, setEmployeeModalOpen] = useState(false);
   const [employeeLeavesLoading, setEmployeeLeavesLoading] = useState(false);
-<<<<<<< HEAD
-  const [editDesignationOpen, setEditDesignationOpen] = useState(false);
-  const [designationChoice, setDesignationChoice] = useState("");
-  const [customDesignation, setCustomDesignation] = useState("");
-  const [savingDesignation, setSavingDesignation] = useState(false);
-  const [remarks, setRemarks] = useState<EmployeeRemark[]>([]);
-  const [remarksLoading, setRemarksLoading] = useState(false);
-  const [addRemarkOpen, setAddRemarkOpen] = useState(false);
-  const [savingRemark, setSavingRemark] = useState(false);
-  const [remarkForm, setRemarkForm] = useState({
-    remarkType: "General" as RemarkType,
-    title: "",
-    description: "",
-    date: todayInputDate(),
-=======
   const [editDetailsOpen, setEditDetailsOpen] = useState(false);
   const [savingDetails, setSavingDetails] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -102,7 +87,16 @@ function EmployeesPage() {
     dob: "",
     doa: "",
     doj: "",
->>>>>>> 593b618f7d8cffc6941e685de84f9ca432f347d0
+  });
+  const [remarks, setRemarks] = useState<EmployeeRemark[]>([]);
+  const [remarksLoading, setRemarksLoading] = useState(false);
+  const [addRemarkOpen, setAddRemarkOpen] = useState(false);
+  const [savingRemark, setSavingRemark] = useState(false);
+  const [remarkForm, setRemarkForm] = useState({
+    remarkType: "General" as RemarkType,
+    title: "",
+    description: "",
+    date: todayInputDate(),
   });
 
   async function openEmployeeModal(employee: Employee) {
@@ -123,11 +117,10 @@ function EmployeesPage() {
     }
   }
 
-<<<<<<< HEAD
   async function loadEmployeeRemarks(employeeId: string) {
     setRemarksLoading(true);
     try {
-      const res = await fetch(`/employees/${encodeURIComponent(employeeId)}/remarks`, { cache: "no-store" });
+      const res = await fetch(apiUrl(`/api/employees/${encodeURIComponent(employeeId)}/remarks`), { cache: "no-store" });
       const data = res.ok ? await res.json() : [];
       setRemarks(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -136,14 +129,6 @@ function EmployeesPage() {
     } finally {
       setRemarksLoading(false);
     }
-  }
-
-  function openDesignationEditor() {
-    const currentDesignation = employeeLeaves?.designation ?? selectedEmployee?.designation ?? "";
-    const known = designations.includes(currentDesignation);
-    setDesignationChoice(known ? currentDesignation : "Other");
-    setCustomDesignation(known ? "" : currentDesignation);
-    setEditDesignationOpen(true);
   }
 
   function openRemarkDialog() {
@@ -169,7 +154,7 @@ function EmployeesPage() {
 
     setSavingRemark(true);
     try {
-      const remarkUrl = `/employees/${encodeURIComponent(employeeId)}/remarks`;
+      const remarkUrl = apiUrl(`/api/employees/${encodeURIComponent(employeeId)}/remarks`);
       const response = await fetch(remarkUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -198,8 +183,6 @@ function EmployeesPage() {
     }
   }
 
-  async function saveDesignation() {
-=======
   function openDetailsEditor() {
     const stationName = employeeLeaves?.stationName ?? selectedEmployee?.stationName ?? "";
     const currentStation = stations.find((station) => station.stationName === stationName);
@@ -217,7 +200,6 @@ function EmployeesPage() {
   }
 
   async function saveDetails() {
->>>>>>> 593b618f7d8cffc6941e685de84f9ca432f347d0
     const employeeId = employeeLeaves?.employeeId ?? selectedEmployee?.employeeId;
     if (!employeeId || !editForm.employeeId.trim() || !editForm.name.trim() || !editForm.designation.trim() || !editForm.stationId) {
       toast.error("Employee ID, name, designation and station are required");
@@ -409,20 +391,14 @@ function EmployeesPage() {
                   <div>Leaves Used This Month: <strong>{employeeLeaves.leavesUsedThisMonth ?? 0}</strong></div>
                   <div>Current Status: <strong>{employeeLeaves.currentStatus ?? "Present"}</strong></div>
                 </div>
-<<<<<<< HEAD
                 <div className="mb-4 flex flex-wrap gap-2">
-                  <Button onClick={openDesignationEditor}>
-                    Edit Designation
+                  <Button onClick={openDetailsEditor}>
+                    Edit Employee Details
                   </Button>
                   <Button variant="outline" onClick={openRemarkDialog}>
                     Add Remark
                   </Button>
                 </div>
-=======
-                <Button className="mb-4" onClick={openDetailsEditor}>
-                  Edit Employee Details
-                </Button>
->>>>>>> 593b618f7d8cffc6941e685de84f9ca432f347d0
 
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
                   <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
