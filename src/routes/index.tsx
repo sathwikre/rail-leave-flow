@@ -355,78 +355,83 @@ function Dashboard() {
             PENDING REQUESTS ON SELECTED DATE ({pendingRequestsLoaded ? pendingRequests.length : "..."})
           </h2>
         </div>
-        <div className="p-5">
+        <div className="overflow-x-auto">
           {pendingRequests.length > 0 ? (
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            <table className="w-full text-sm">
+              <thead className="bg-muted/40 text-xs uppercase text-muted-foreground">
+                <tr>
+                  <th className="text-left px-5 py-3 font-medium">Employee ID</th>
+                  <th className="text-left px-5 py-3 font-medium">Employee Name</th>
+                  <th className="text-left px-5 py-3 font-medium">Station</th>
+                  <th className="text-left px-5 py-3 font-medium">Designation</th>
+                  <th className="text-left px-5 py-3 font-medium">Leave</th>
+                  <th className="text-left px-5 py-3 font-medium">Already On Leave</th>
+                  <th className="text-left px-5 py-3 font-medium">Recent Leave</th>
+                  <th className="text-left px-5 py-3 font-medium">Status</th>
+                  <th className="text-left px-5 py-3 font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
               {pendingRequests.map((request) => (
-                <div key={request.id} className="rounded-lg border border-border bg-background p-4">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                      <div className="font-display text-base font-bold">{request.employeeName}</div>
-                      <div className="mt-1 text-xs font-mono text-muted-foreground">{request.employeeId}</div>
-                      <div className="mt-1 text-sm text-muted-foreground">
-                        {request.designation} - {request.stationName}
-                      </div>
+                <tr key={request.id} className="border-t border-border hover:bg-muted/30">
+                  <td className="px-5 py-3 font-mono text-xs">{request.employeeId}</td>
+                  <td className="px-5 py-3">{request.employeeName}</td>
+                  <td className="px-5 py-3">{request.stationName}</td>
+                  <td className="px-5 py-3">{request.designation}</td>
+                  <td className="px-5 py-3 whitespace-nowrap">
+                    <div className="font-semibold">
+                      {formatShortDate(request.fromDate)} to {formatShortDate(request.toDate)}
                     </div>
-                    <StatusBadge status={request.status} />
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-                    <div className="rounded-md border border-border bg-muted/20 p-3">
-                      <div className="text-xs uppercase text-muted-foreground">Leave</div>
-                      <div className="mt-1 font-semibold">
-                        {formatShortDate(request.fromDate)} to {formatShortDate(request.toDate)}
-                      </div>
-                      <div className="mt-1 text-muted-foreground">
-                        {request.days} Days - {request.leaveType}
-                      </div>
+                    <div className="text-xs text-muted-foreground">
+                      {request.days} Days - {request.leaveType}
                     </div>
-                    <div className="rounded-md border border-border bg-muted/20 p-3">
-                      <div className="text-xs uppercase text-muted-foreground">Employees Already On Leave</div>
-                      <div className="mt-1 font-display text-2xl font-bold">{request.employeesAlreadyOnLeave}</div>
-                    </div>
-                    <div className="rounded-md border border-border bg-muted/20 p-3">
-                      <div className="text-xs uppercase text-muted-foreground">Actions</div>
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => approvePendingRequest(request)}
-                          disabled={processingRequestId === request.id}
-                        >
-                          Approve
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => rejectPendingRequest(request)}
-                          disabled={processingRequestId === request.id}
-                        >
-                          Reject
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 rounded-md border border-border p-3 text-sm">
-                    <div className="text-xs uppercase text-muted-foreground">Recent Leave Taken By This Employee</div>
+                  </td>
+                  <td className="px-5 py-3 font-semibold">{request.employeesAlreadyOnLeave}</td>
+                  <td className="px-5 py-3 whitespace-nowrap">
                     {request.recentLeave ? (
-                      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-                        <span className="font-semibold">
+                      <div>
+                        <div className="font-semibold">
                           {formatShortDate(request.recentLeave.fromDate)} to {formatShortDate(request.recentLeave.toDate)}
-                        </span>
-                        <span>{request.recentLeave.leaveType}</span>
-                        <span>{request.recentLeave.days} Days</span>
-                        <StatusBadge status={request.recentLeave.status} />
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          <span>
+                            {request.recentLeave.days} Days - {request.recentLeave.leaveType}
+                          </span>
+                          <StatusBadge status={request.recentLeave.status} />
+                        </div>
                       </div>
                     ) : (
-                      <div className="mt-2 text-muted-foreground">No previous leave history.</div>
+                      <span className="text-muted-foreground">No previous leave</span>
                     )}
-                  </div>
-                </div>
+                  </td>
+                  <td className="px-5 py-3">
+                    <StatusBadge status={request.status} />
+                  </td>
+                  <td className="px-5 py-3">
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => approvePendingRequest(request)}
+                        disabled={processingRequestId === request.id}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => rejectPendingRequest(request)}
+                        disabled={processingRequestId === request.id}
+                      >
+                        Reject
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
               ))}
-            </div>
+              </tbody>
+            </table>
           ) : (
-            <div className="py-4 text-sm text-muted-foreground">
+            <div className="px-5 py-5 text-sm text-muted-foreground">
               {pendingRequestsLoaded ? "No pending requests." : "Loading pending requests..."}
             </div>
           )}
