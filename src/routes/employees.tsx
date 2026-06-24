@@ -363,7 +363,7 @@ function EmployeesPage() {
         </Button>
       </div>
       <Dialog open={employeeModalOpen} onOpenChange={setEmployeeModalOpen}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-h-[92vh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-5xl">
           <DialogHeader>
             <DialogTitle>Employee Details</DialogTitle>
             <DialogDescription>
@@ -371,25 +371,32 @@ function EmployeesPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="overflow-x-auto">
+          <div>
             {employeeLeavesLoading ? (
               <div className="p-6 text-sm text-muted-foreground">Loading...</div>
             ) : !employeeLeaves ? (
               <div className="p-6 text-sm text-muted-foreground">No leave records found.</div>
             ) : (
               <div>
-                <div className="grid grid-cols-2 gap-2 text-sm mb-4">
-                  <div>Employee ID: <strong>{employeeLeaves.employeeId}</strong></div>
-                  <div>Name: <strong>{employeeLeaves.employeeName}</strong></div>
-                  <div>Current Designation: <strong>{employeeLeaves.designation}</strong></div>
-                  <div>Station: <strong>{employeeLeaves.stationName ?? "-"}</strong></div>
-                  <div>DOB: <strong>{employeeLeaves.dob ?? "-"}</strong></div>
-                  <div>DOJ: <strong>{employeeLeaves.doj ?? "-"}</strong></div>
-                  <div>DOA: <strong>{employeeLeaves.doa ?? "-"}</strong></div>
-                  <div>Phone: <strong>{employeeLeaves.phone ?? "-"}</strong></div>
-                  <div>Latest Leave Date: <strong>{employeeLeaves.latestLeaveDate ?? "-"}</strong></div>
-                  <div>Leaves Used This Month: <strong>{employeeLeaves.leavesUsedThisMonth ?? 0}</strong></div>
-                  <div>Current Status: <strong>{employeeLeaves.currentStatus ?? "Present"}</strong></div>
+                <div className="mb-4 grid grid-cols-1 gap-3 rounded-2xl border border-border bg-muted/20 p-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                  {[
+                    ["Employee ID", employeeLeaves.employeeId],
+                    ["Name", employeeLeaves.employeeName],
+                    ["Designation", employeeLeaves.designation],
+                    ["Station", employeeLeaves.stationName ?? "-"],
+                    ["DOB", employeeLeaves.dob ?? "-"],
+                    ["DOJ", employeeLeaves.doj ?? "-"],
+                    ["DOA", employeeLeaves.doa ?? "-"],
+                    ["Phone", employeeLeaves.phone ?? "-"],
+                    ["Latest Leave Date", employeeLeaves.latestLeaveDate ?? "-"],
+                    ["Leaves Used This Month", employeeLeaves.leavesUsedThisMonth ?? 0],
+                    ["Current Status", employeeLeaves.currentStatus ?? "Present"],
+                  ].map(([label, value]) => (
+                    <div key={label} className="rounded-xl bg-background/80 px-3 py-2">
+                      <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</div>
+                      <div className="mt-1 break-words font-semibold text-foreground">{value}</div>
+                    </div>
+                  ))}
                 </div>
                 <div className="mb-4 flex flex-wrap gap-2">
                   <Button onClick={openDetailsEditor}>
@@ -400,69 +407,113 @@ function EmployeesPage() {
                   </Button>
                 </div>
 
-                <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
                   <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-                    <div className="p-5 border-b border-border">
-                      <h3 className="font-display text-lg font-bold">Leave History</h3>
+                    <div className="flex items-center justify-between gap-3 border-b border-border p-4 sm:p-5">
+                      <div>
+                        <h3 className="font-display text-lg font-bold">Leave History</h3>
+                        <p className="text-xs text-muted-foreground">Previous leave requests for this employee</p>
+                      </div>
+                      <Badge variant="secondary">{(employeeLeaves.leaveHistory || []).length}</Badge>
                     </div>
-                    <div className="overflow-x-auto">
+                    <div className="hidden overflow-x-auto md:block">
                       <table className="w-full text-sm">
                         <thead className="bg-muted/40 text-xs uppercase text-muted-foreground">
                           <tr>
-                            <th className="text-left px-5 py-3 font-medium">From Date</th>
-                            <th className="text-left px-5 py-3 font-medium">To Date</th>
-                            <th className="text-left px-5 py-3 font-medium">Days</th>
-                            <th className="text-left px-5 py-3 font-medium">Reason</th>
-                            <th className="text-left px-5 py-3 font-medium">Status</th>
-                            <th className="text-left px-5 py-3 font-medium">Source</th>
+                            <th className="text-left px-4 py-3 font-medium">Date</th>
+                            <th className="text-left px-4 py-3 font-medium">Days</th>
+                            <th className="text-left px-4 py-3 font-medium">Reason</th>
+                            <th className="text-left px-4 py-3 font-medium">Status</th>
+                            <th className="text-left px-4 py-3 font-medium">Source</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {(employeeLeaves.leaveHistory || []).map((leave: any) => (
-                            <tr key={leave.id} className="border-t border-border hover:bg-muted/30">
-                              <td className="px-5 py-3 whitespace-nowrap">{leave.fromDate}</td>
-                              <td className="px-5 py-3 whitespace-nowrap">{leave.toDate}</td>
-                              <td className="px-5 py-3 font-semibold">{leave.days}</td>
-                              <td className="px-5 py-3 text-muted-foreground">{leave.reasonType ?? leave.reason ?? "-"}</td>
-                              <td className="px-5 py-3">{leave.status}</td>
-                              <td className="px-5 py-3 text-muted-foreground">{leave.source ?? "Manual"}</td>
+                          {(employeeLeaves.leaveHistory || []).map((leave: any, index: number) => (
+                            <tr key={leave.id ?? index} className="border-t border-border hover:bg-muted/30">
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                <div className="font-medium">{leave.fromDate}</div>
+                                <div className="text-xs text-muted-foreground">to {leave.toDate}</div>
+                              </td>
+                              <td className="px-4 py-3 font-semibold">{leave.days}</td>
+                              <td className="px-4 py-3 text-muted-foreground">{leave.reasonType ?? leave.reason ?? "-"}</td>
+                              <td className="px-4 py-3">
+                                <Badge variant="outline">{leave.status}</Badge>
+                              </td>
+                              <td className="px-4 py-3 text-muted-foreground">{leave.source ?? "Manual"}</td>
                             </tr>
                           ))}
                           {(employeeLeaves.leaveHistory || []).length === 0 && (
                             <tr>
-                              <td className="px-5 py-5 text-muted-foreground" colSpan={6}>No leave records found.</td>
+                              <td className="px-5 py-5 text-muted-foreground" colSpan={5}>No leave records found.</td>
                             </tr>
                           )}
                         </tbody>
                       </table>
                     </div>
+                    <div className="space-y-3 p-4 md:hidden">
+                      {(employeeLeaves.leaveHistory || []).map((leave: any, index: number) => (
+                        <div key={leave.id ?? index} className="rounded-xl border border-border bg-muted/20 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="font-semibold">{leave.fromDate} to {leave.toDate}</div>
+                              <div className="text-xs text-muted-foreground">{leave.reasonType ?? leave.reason ?? "-"}</div>
+                            </div>
+                            <Badge variant="outline">{leave.status}</Badge>
+                          </div>
+                          <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                            <div>
+                              <div className="text-muted-foreground">Days</div>
+                              <div className="font-semibold">{leave.days}</div>
+                            </div>
+                            <div>
+                              <div className="text-muted-foreground">Source</div>
+                              <div className="font-semibold">{leave.source ?? "Manual"}</div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {(employeeLeaves.leaveHistory || []).length === 0 && (
+                        <div className="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">
+                          No leave records found.
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   <div className="rounded-2xl border border-border bg-card shadow-sm overflow-hidden">
-                    <div className="p-5 border-b border-border">
-                      <h3 className="font-display text-lg font-bold">Remarks History</h3>
+                    <div className="flex items-center justify-between gap-3 border-b border-border p-4 sm:p-5">
+                      <div>
+                        <h3 className="font-display text-lg font-bold">Remarks History</h3>
+                        <p className="text-xs text-muted-foreground">Notes and performance remarks</p>
+                      </div>
+                      <Badge variant="secondary">{remarks.length}</Badge>
                     </div>
-                    <div className="overflow-x-auto">
+                    <div className="hidden overflow-x-auto md:block">
                       <table className="w-full text-sm">
                         <thead className="bg-muted/40 text-xs uppercase text-muted-foreground">
                           <tr>
-                            <th className="text-left px-5 py-3 font-medium">Date</th>
-                            <th className="text-left px-5 py-3 font-medium">Remark Type</th>
-                            <th className="text-left px-5 py-3 font-medium">Remark Title</th>
-                            <th className="text-left px-5 py-3 font-medium">Added By</th>
+                            <th className="text-left px-4 py-3 font-medium">Date</th>
+                            <th className="text-left px-4 py-3 font-medium">Type</th>
+                            <th className="text-left px-4 py-3 font-medium">Remark</th>
+                            <th className="text-left px-4 py-3 font-medium">Added By</th>
                           </tr>
                         </thead>
                         <tbody>
                           {remarks.map((remark) => (
                             <tr key={remark.id} className="border-t border-border hover:bg-muted/30">
-                              <td className="px-5 py-3 whitespace-nowrap">{remark.date}</td>
-                              <td className="px-5 py-3">
+                              <td className="px-4 py-3 whitespace-nowrap">{remark.date}</td>
+                              <td className="px-4 py-3">
                                 <Badge variant="outline" className={remarkBadgeClass(remark.remarkType)}>
                                   {remark.remarkType}
                                 </Badge>
                               </td>
-                              <td className="px-5 py-3">{remark.title}</td>
-                              <td className="px-5 py-3 text-muted-foreground">{remark.addedBy}</td>
+                              <td className="px-4 py-3">
+                                <div className="font-medium">{remark.title}</div>
+                                {remark.description ? (
+                                  <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">{remark.description}</div>
+                                ) : null}
+                              </td>
+                              <td className="px-4 py-3 text-muted-foreground">{remark.addedBy}</td>
                             </tr>
                           ))}
                           {remarks.length === 0 && (
@@ -474,6 +525,29 @@ function EmployeesPage() {
                           )}
                         </tbody>
                       </table>
+                    </div>
+                    <div className="space-y-3 p-4 md:hidden">
+                      {remarks.map((remark) => (
+                        <div key={remark.id} className="rounded-xl border border-border bg-muted/20 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <div className="font-semibold">{remark.title}</div>
+                              <div className="text-xs text-muted-foreground">{remark.date} · {remark.addedBy}</div>
+                            </div>
+                            <Badge variant="outline" className={remarkBadgeClass(remark.remarkType)}>
+                              {remark.remarkType}
+                            </Badge>
+                          </div>
+                          {remark.description ? (
+                            <p className="mt-3 text-sm text-muted-foreground">{remark.description}</p>
+                          ) : null}
+                        </div>
+                      ))}
+                      {remarks.length === 0 && (
+                        <div className="rounded-xl border border-dashed border-border p-5 text-sm text-muted-foreground">
+                          {remarksLoading ? "Loading remarks..." : "No remarks found."}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
