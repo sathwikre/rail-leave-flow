@@ -1,6 +1,7 @@
 import { Employee } from "../models/employeeModel.js";
 import { LeaveRequest } from "../models/leaveRequestModel.js";
 import { Station } from "../models/stationModel.js";
+import { isEmployeeCountExcludedStation } from "../data/stationRules.js";
 import {
   lastLeaveDate,
   leavesUsedThisMonth,
@@ -42,7 +43,9 @@ export async function getStationReport(_req, res) {
 
       return {
         stationName: station.stationName,
-        totalEmployees: stationEmployees.length,
+        totalEmployees: isEmployeeCountExcludedStation(station.stationName)
+          ? 0
+          : stationEmployees.length,
         employeesOnLeave: onLeaveIds.length,
         employeesExceedingMonthlyLeaveLimit: usage.filter(
           (used) => used > MONTHLY_LEAVE_LIMIT,
@@ -127,7 +130,7 @@ export async function getStationById(req, res) {
   res.json({
     stationName: station.stationName,
     stationMaster: station.stationMaster,
-    totalEmployees: employees.length,
+    totalEmployees: isEmployeeCountExcludedStation(station.stationName) ? 0 : employees.length,
     employeesOnLeave: onLeaveIds.length,
     employeesExceedingLimit: exceedingCount,
     employees: employeeDetails,

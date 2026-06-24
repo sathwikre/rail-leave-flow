@@ -15,6 +15,7 @@ import { seedIfEmpty } from "./seed-data.js";
 import { todayDateString } from "./controllers/leaveMetrics.js";
 import * as employeeStats from "./services/employeeStatsService.js";
 import { employeeDocument, railwayEmployees } from "./data/mantapampalleEmployees.js";
+import { stationCountExcludedStations } from "./data/stationRules.js";
 
 export async function createApp() {
   await connectDatabase();
@@ -171,9 +172,10 @@ function mountRoutes(app, prefix) {
 async function dashboard(_req, res) {
   res.set("Cache-Control", "no-store");
   const today = todayDateString();
+  const countedStationsFilter = { stationName: { $nin: stationCountExcludedStations } };
   const [totalStations, totalEmployees, employeesOnLeaveToday, pendingLeaveRequests, recentlyApproved] =
     await Promise.all([
-      Station.countDocuments(),
+      Station.countDocuments(countedStationsFilter),
       employeeStats.getTotalEmployees(),
       employeeStats.getEmployeesOnLeaveToday(),
       LeaveRequest.countDocuments({ status: "Pending" }),
@@ -211,8 +213,9 @@ async function onLeaveToday(_req, res) {
 async function dashboardStats(_req, res) {
   res.set("Cache-Control", "no-store");
   try {
+    const countedStationsFilter = { stationName: { $nin: stationCountExcludedStations } };
     const [totalStations, totalEmployees, onLeaveToday, pendingRequests] = await Promise.all([
-      Station.countDocuments(),
+      Station.countDocuments(countedStationsFilter),
       employeeStats.getTotalEmployees(),
       employeeStats.getEmployeesOnLeaveToday(),
       LeaveRequest.countDocuments({ status: "Pending" }),

@@ -1,6 +1,10 @@
 import { Employee } from "../models/employeeModel.js";
 import { LeaveRequest } from "../models/leaveRequestModel.js";
 import { todayDateString } from "../controllers/leaveMetrics.js";
+import {
+  employeeCountExcludedStations,
+  isEmployeeCountExcludedStation,
+} from "../data/stationRules.js";
 
 function validEmployeeFilter() {
   return {
@@ -13,10 +17,15 @@ function validEmployeeFilter() {
 
 export async function getTotalEmployees() {
   const filter = validEmployeeFilter();
+  filter.stationName = {
+    ...filter.stationName,
+    $nin: employeeCountExcludedStations,
+  };
   return Employee.countDocuments(filter);
 }
 
 export async function getEmployeesCountForStation(stationName) {
+  if (isEmployeeCountExcludedStation(stationName)) return 0;
   const filter = { ...validEmployeeFilter(), stationName };
   return Employee.countDocuments(filter);
 }
